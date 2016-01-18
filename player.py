@@ -8,7 +8,7 @@ from m3u8_parser import parse_m3u8
 
 
 PLAYER_CMD = "mplayer"
-BUFFER_DIR = "tmp_video"
+BUFFER_PATH = "tmp_video"
 
 
 def direct_dl(url):
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         exit()
     infolist = parse_m3u8(sys.argv[1])
     first_seg_ready = False
-    downloader = threading.Thread(target=download, args=(infolist, BUFFER_DIR))
+    downloader = threading.Thread(target=download, args=(infolist, BUFFER_PATH))
     downloader.start()
 
     # Wait for the buffer to be ready and start streaming (not robust now)
@@ -50,4 +50,4 @@ if __name__ == "__main__":
             break
         else:
             time.sleep(1)
-    subprocess.run(PLAYER_CMD.split() + [BUFFER_DIR])
+    subprocess.run(PLAYER_CMD.split() + [BUFFER_PATH])
