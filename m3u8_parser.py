@@ -64,8 +64,5 @@ def parse_m3u8(url):
 
 # unit test
 if __name__ == "__main__":
-    url_var = "http://stream.flowplayer.org/drive.m3u8"
-    url_novar = "http://stream.flowplayer.org/drive/0/360p/pl.m3u8"
-    print(parse_m3u8_novar(url=url_novar))
-    print(parse_m3u8(url=url_novar))
+    url_var = "http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
     print(parse_m3u8(url=url_var))
