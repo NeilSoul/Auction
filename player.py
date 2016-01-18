@@ -22,15 +22,15 @@ def request_dl(url):
     pass
 
 
-def download(filelist, bufdir):
+def download(infolist, bufdir):
     """Download the video segments, choosing routes and bitrates."""
     global first_seg_ready
     # TODO: always prefer the lowest bw for now
     with open(bufdir, "ab") as out:
-        preferred_bw = sorted(filelist[0].keys())[0]
-        for item in filelist:
+        preferred_bw = sorted(infolist[0][1].keys())[0]
+        for item in infolist:
             # TODO: choose route
-            out.write(direct_dl(item[preferred_bw]))
+            out.write(direct_dl(item[1][preferred_bw]))
             first_seg_ready = True
 
 
@@ -39,9 +39,9 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("No input url.")
         exit()
-    filelist = parse_m3u8(sys.argv[1])
+    infolist = parse_m3u8(sys.argv[1])
     first_seg_ready = False
-    downloader = threading.Thread(target=download, args=(filelist, BUFFER_DIR))
+    downloader = threading.Thread(target=download, args=(infolist, BUFFER_DIR))
     downloader.start()
 
     # Wait for the buffer to be ready and start streaming (not robust now)
