@@ -2,13 +2,14 @@
 import socket
 import select
 import threading
+import argparse
 import setting
 import aulog
 
 class Server(object):
-	def __init__(self):
-		self.bindAddr = (setting.HOST, setting.CTR_PORT)
-		self.broadAddr = (setting.BROADCAST, setting.CTR_PORT)
+	def __init__(self, host=setting.HOST, port=setting.CTR_PORT):
+		self.bindAddr = (host, port)
+		self.broadAddr = (setting.BROADCAST, port)
 		self.running = True 
 
 	def listen(self):
@@ -26,6 +27,8 @@ class Server(object):
 		self.sock.close()
 
 	def console(self):
+		self.sendsock =socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		self.sendsock.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
 		while self.running:
 			command = raw_input()
 			if not command:
@@ -34,9 +37,10 @@ class Server(object):
 				self.running = False
 				print 'Bye bye~Message Center.'
 			else:
-				self.sock.sendto(command.lower(), self.broadAddr)
+				self.sendsock.sendto(command.lower(), self.broadAddr)
 
 		self.running = False
+		self.sendsock.close()
 
 	def run(self):
 		self.listenThread = threading.Thread(target = self.listen)
@@ -46,6 +50,14 @@ class Server(object):
 		self.listenThread.join()
 		self.consoleThread.join()
 
+def parse_args():
+	parser = argparse.ArgumentParser(description='SRV')
+	parser.add_argument('--host', required=True, help='host')
+	parser.add_argument('--port', type=int, required=True, help='port')
+	return parser.parse_args()
+
 if __name__ == "__main__":
-    server = Server()
-    server.run()
+	#args = parse_args()
+	#server = Server(args.host, args.port)
+	server = Server()
+	server.run()
