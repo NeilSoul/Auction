@@ -21,7 +21,7 @@ class Message(object):
 		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.sender.setblocking(False)
 		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
-		self.sender_address = (setting.BROADCAST, port)
+		self.sender_address = (setting.MSG_BROADCAST, port)
 		#sockets from which we except to read
 		self.inputs = [self.server]
 		 
