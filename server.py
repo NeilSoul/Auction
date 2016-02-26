@@ -184,7 +184,7 @@ class Server:
         The message starts with "BID:", followed by (bitrate, price).
         """
         logging.info("Starting bid.")
-        pref = lambda r: utility(r, duration) - cost(r, duration)
+        pref = lambda r: utility(r) - cost(r)
         self.rate = sorted(bitrates, key=pref, reverse=True)[0]
         price = utility(self.rate)
         msg = repr((self.rate, price))
