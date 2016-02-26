@@ -19,25 +19,26 @@ REQUEST_TEMPLATE = 'GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n'
 
 class Downloader(asyncio.Protocol):
 
-    def __init__(self, player, url, buflist, idx_buf):
+    def __init__(self, player):
         self.player = player
-        o = urlparse(url)
-        self.request = REQUEST_TEMPLATE % (o.path, o.netloc)
-        self.buflist = buflist
-        self.idx_buf = idx_buf
-
         # use a list and join it at last for efficiency
         self.buf = []
 
     def connection_made(self, transport):
-        transport.write(self.request.encode())
+        self.idx_buf = self.player.current_idx
+        self.player.current_idx += 1
+        url = self.player.infolist[self.idx_buf][self.player.rate]
+        o = urlparse(url)
+        request = REQUEST_TEMPLATE % (o.path, o.netloc)
+        transport.write(request.encode())
 
     def data_received(self, data):
         self.buf.append(data)
 
     def connection_lost(self, _):
         # strip HTTP header
-        self.buflist[self.idx_buf] = b''.join(self.buf).split(b'\r\n', 1)[1]
+        self.player.buflist[self.idx_buf] = b''.join(
+            self.buf).split(b'\r\n', 1)[1]
         writer = threading.Thread(target=self.player.write_file)
         writer.start()
 
@@ -45,8 +46,8 @@ class Downloader(asyncio.Protocol):
 class DirectDownloader(Downloader):
 
     def connection_made(self, transport):
-        logging.info("Downloading segment %d directly ..." % self.idx_buf)
         Downloader.connection_made(self, transport)
+        logging.info("Downloading segment %d directly ..." % self.idx_buf)
 
     def connection_lost(self, _):
         logging.info("Download completed.")
@@ -58,10 +59,10 @@ class DirectDownloader(Downloader):
 class ProxyDownloader(Downloader):
 
     def connection_made(self, transport):
+        Downloader.connection_made(self, transport)
         peername = transport.get_extra_info("peername")
         logging.info("Downloading segment %d from %s..."
                      % (self.idx_buf, peername[0]))
-        Downloader.connection_made(self, transport)
 
     def connection_lost(self, _):
         logging.info("Download completed.")
@@ -80,14 +81,14 @@ class Player(asyncio.Protocol):
         self.write_idx = 0
         self.writing = False
 
+        self.bitrates = sorted(infolist[0].keys())
         # start with the lowest bitrate
-        self.rate = sorted(infolist[0].keys())[0]
+        self.rate = self.bitrates[0]
 
     def connection_made(self, transport):
         self.transport = transport
         logging.info("Connected to server.")
-        bitrates = sorted(self.infolist[0].keys())
-        transport.write(repr(bitrates).encode())
+        transport.write(repr(self.bitrates).encode())
         asyncio.Task(self.direct_dl())
 
     def data_received(self, data):
@@ -99,11 +100,9 @@ class Player(asyncio.Protocol):
     @asyncio.coroutine
     def proxy_dl(self, proxy_ip):
         url = self.infolist[self.current_idx][self.rate]
-        self.current_idx += 1
         # does not take download failure into account
         yield from self.loop.create_connection(
-            lambda: ProxyDownloader(self, url, self.buflist,
-                                    self.current_idx - 1),
+            lambda: ProxyDownloader(self),
             proxy_ip, PROXY_PORT
         )
         self.check_complete()
@@ -116,10 +115,8 @@ class Player(asyncio.Protocol):
             port = int(port_str)
         except:
             host, port = urlparse(url).netloc, 80
-        self.current_idx += 1
         yield from self.loop.create_connection(
-            lambda: DirectDownloader(self, url, self.buflist,
-                                     self.current_idx - 1),
+            lambda: DirectDownloader(self),
             host, port
         )
 
