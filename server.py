@@ -10,7 +10,7 @@ from algorithm import utility, cost
 CONTROL_PORT = 7000
 PLAYER_PORT = 7001
 PROXY_PORT = 7002
-BROADCAST_IP = "192.168.1.255"
+BROADCAST_IP = "192.168.11.255"
 BROADCAST_IDLE_INTERVAL = 1.0
 
 
@@ -31,8 +31,7 @@ class PlayerHandler(asyncio.Protocol):
             transport.close()
 
     def data_received(self, data):
-        """Receive stream info, start bid."""
-        self.factory.bid(*eval(data.decode()))
+        self.bitrates = eval(data.decode())
 
     def connection_lost(self, _):
         self.factory.player = None
@@ -49,7 +48,6 @@ class UDPControl(asyncio.Protocol):
         self.broadcast_addr = (BROADCAST_IP, CONTROL_PORT)
         self.rand_str = ''.join([random.choice(string.ascii_letters)
                                  for _ in range(10)])
-        # self.broadcast("ECHO" + self.rand_string)
 
     def connection_made(self, transport):
         self.factory.control = self
@@ -64,17 +62,17 @@ class UDPControl(asyncio.Protocol):
         data = data.decode()
         if data == "FAILURE":
             logging.info("Bid failed.")
-            self.factory.write_player(data)
         elif data.startswith("IDLE"):
             if data.split(':')[1] != self.rand_str:
                 logging.info("Received offer from %s" % ip)
                 self.factory.auctioneer = ip
-                self.factory.write_player("IDLE")
+                if self.factory.player:
+                    self.factory.bid(self.factory.player.bitrates)
         elif data.startswith("SUCCESS"):
             logging.info("Bid succeeded.")
-            success, payment = data.split(':', 1)
-            # TODO: billing system
-            msg = ','.join((success, ip, str(self.factory.rate)))
+            payment = data.split(':', 1)[1]
+            # TODO: log payment
+            msg = ','.join((ip, str(self.factory.rate)))
             self.factory.write_player(msg)
         elif data.startswith("BID"):
             # map this Control instance to its bid info
@@ -152,7 +150,6 @@ class Server:
         self.player = None
         self.idle = True
 
-        # TODO: integrate with initialization module
         self.coros = []
         self.coros.append(self.loop.create_datagram_endpoint(
             lambda: UDPControl(self), ("0.0.0.0", CONTROL_PORT)))
@@ -174,40 +171,37 @@ class Server:
             self.loop.call_later(BROADCAST_IDLE_INTERVAL, self.broadcast_idle)
         elif self.idle:
             if self.bid_info:
+                # TODO: device-specific parameters to cost function
                 self.auction()
             else:
-                # TODO: device-specific parameters to cost function
                 self.control.broadcast_idle()
                 self.loop.call_later(BROADCAST_IDLE_INTERVAL,
                                      self.broadcast_idle)
 
-    def bid(self, duration, rate_url_list):
+    def bid(self, bitrates):
         """Choose a bitrate and send the bid message.
 
-        The message starts with "BID:",
-        followed by (url, bitrate, duration, price).
+        The message starts with "BID:", followed by (bitrate, price).
         """
         logging.info("Starting bid.")
-        rates = rate_url_list.keys()
         pref = lambda r: utility(r, duration) - cost(r, duration)
-        self.rate = sorted(rates, key=pref, reverse=True)[0]
-        url = rate_url_list[self.rate]
-        price = utility(self.rate, duration)
-        msg = repr((url, self.rate, duration, price))
+        self.rate = sorted(bitrates, key=pref, reverse=True)[0]
+        price = utility(self.rate)
+        msg = repr((self.rate, price))
         self.control.sendto("BID:" + msg, self.auctioneer)
 
     def auction(self):
         """Choose a winner, inform all bidders, and reset auction state."""
-        # each value is (url, bitrate, duration, price)
+        # each value is (bitrate, price)
         info = self.bid_info
         logging.info("Received bid from %d peers." % len(info))
-        score = lambda bidder: info[bidder][3] - cost(*info[bidder][1:3])
+        score = lambda bidder: info[bidder][1] - cost(info[bidder][0])
         bidders = info.keys()
         if len(bidders) == 1:
             winner = second = list(bidders)[0]
         else:
             winner, second = sorted(bidders, key=score, reverse=True)[:2]
-        payment = score(second) + cost(*info[winner][1:3])
+        payment = score(second) + cost(info[winner][0])
         for bidder in bidders:
             if bidder is winner:
                 self.control.sendto("SUCCESS:" + str(payment), bidder)

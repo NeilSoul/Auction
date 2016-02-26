@@ -1,7 +1,7 @@
-def utility(rate, duration):
+def utility(rate):
     # TODO
     return rate
 
-def cost(rate, duration):
+def cost(rate):
     # TODO
-    return rate * duration
+    return rate * 10

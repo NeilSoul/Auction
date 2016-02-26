@@ -18,6 +18,7 @@ REQUEST_TEMPLATE = 'GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n'
 
 
 class Downloader(asyncio.Protocol):
+
     def __init__(self, player, url, buflist, idx_buf):
         self.player = player
         o = urlparse(url)
@@ -42,6 +43,7 @@ class Downloader(asyncio.Protocol):
 
 
 class DirectDownloader(Downloader):
+
     def connection_made(self, transport):
         logging.info("Downloading segment %d directly ..." % self.idx_buf)
         Downloader.connection_made(self, transport)
@@ -54,6 +56,7 @@ class DirectDownloader(Downloader):
 
 
 class ProxyDownloader(Downloader):
+
     def connection_made(self, transport):
         peername = transport.get_extra_info("peername")
         logging.info("Downloading segment %d from %s..."
@@ -66,64 +69,62 @@ class ProxyDownloader(Downloader):
 
 
 class Player(asyncio.Protocol):
+
     def __init__(self, loop, infolist):
         self.loop = loop
         self.infolist = infolist
-        self.idx_stack = deque(range(len(infolist)))
-        self.idx_pending = deque()
-        self.buflist = [None] * len(infolist)
+        self.segment_count = len(infolist)
+        self.current_idx = 0
+        self.buflist = [None] * self.segment_count
 
         self.write_idx = 0
         self.writing = False
 
         # start with the lowest bitrate
-        self.rate = sorted(infolist[0][1].keys())[0]
+        self.rate = sorted(infolist[0].keys())[0]
 
     def connection_made(self, transport):
         self.transport = transport
         logging.info("Connected to server.")
+        bitrates = sorted(self.infolist[0].keys())
+        transport.write(repr(bitrates).encode())
         asyncio.Task(self.direct_dl())
 
     def data_received(self, data):
         data = data.decode()
-        if data == "IDLE":
-            if not self.idx_pending:
-                self.idx_pending.append(self.idx_stack.popleft())
-            self.transport.write(repr(infolist[self.idx_pending[0]]).encode())
-        elif data == "FAILURE":
-            self.idx_stack.appendleft(self.idx_pending.popleft())
-        else:
-            # success
-            proxy_ip, rate_str = data.split(',')[1:]
-            self.rate = eval(rate_str)
-            asyncio.Task(self.proxy_dl(proxy_ip))
+        proxy_ip, rate_str = data.split(',')
+        self.rate = eval(rate_str)
+        asyncio.Task(self.proxy_dl(proxy_ip))
 
     @asyncio.coroutine
     def proxy_dl(self, proxy_ip):
-        idx = self.idx_pending.popleft()
-        url = self.infolist[idx][1][self.rate]
+        url = self.infolist[self.current_idx][self.rate]
+        self.current_idx += 1
+        # does not take download failure into account
         yield from self.loop.create_connection(
-            lambda: ProxyDownloader(self, url, self.buflist, idx),
+            lambda: ProxyDownloader(self, url, self.buflist,
+                                    self.current_idx - 1),
             proxy_ip, PROXY_PORT
         )
         self.check_complete()
 
     @asyncio.coroutine
     def direct_dl(self):
-        idx = self.idx_stack.popleft()
-        url = self.infolist[idx][1][self.rate]
+        url = self.infolist[self.current_idx][self.rate]
         try:
             host, port_str = urlparse(url).netloc.rsplit(':', 1)
             port = int(port_str)
         except:
             host, port = urlparse(url).netloc, 80
+        self.current_idx += 1
         yield from self.loop.create_connection(
-            lambda: DirectDownloader(self, url, self.buflist, idx),
+            lambda: DirectDownloader(self, url, self.buflist,
+                                     self.current_idx - 1),
             host, port
         )
 
     def check_complete(self):
-        if not self.idx_stack:
+        if self.current_idx == self.segment_count:
             logging.info("All segments started streaming.")
             self.transport.close()
             return True
@@ -143,7 +144,7 @@ class Player(asyncio.Protocol):
                         player.start()
 
                     self.write_idx += 1
-                    if self.write_idx == len(self.buflist):
+                    if self.write_idx == self.segment_count:
                         break
             self.writing = False
 
@@ -161,11 +162,14 @@ if __name__ == "__main__":
         os.remove(BUFFER_PATH)
     except:
         pass
-    infolist = parse_m3u8(sys.argv[1])
+    infolist_raw = parse_m3u8(sys.argv[1])
+    # [(float, dict)] -> [dict]
+    # assume each segment has equal duration
+    infolist = [item[1] for item in infolist_raw]
     loop = asyncio.get_event_loop()
     # loop.set_debug(True)
     coro = loop.create_connection(lambda: Player(loop, infolist),
-                           "127.0.0.1", PLAYER_PORT)
+                                  "127.0.0.1", PLAYER_PORT)
     loop.run_until_complete(coro)
     loop.run_forever()
     loop.close()
