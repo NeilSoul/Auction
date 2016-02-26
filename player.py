@@ -65,7 +65,7 @@ class ProxyDownloader(Downloader):
                      % (self.idx_buf, peername[0]))
 
     def connection_lost(self, _):
-        logging.info("Download completed.")
+        logging.info("Download of segment %d completed." % self.idx_buf)
         Downloader.connection_lost(self, _)
 
 
@@ -134,6 +134,7 @@ class Player(asyncio.Protocol):
                 while self.buflist[self.write_idx]:
                     f.write(self.buflist[self.write_idx])
                     self.buflist[self.write_idx] = None
+                    logging.info("Segment %d ready to play." % self.write_idx)
 
                     # first segment buffered, start playing
                     if self.write_idx == 0:
@@ -146,12 +147,16 @@ class Player(asyncio.Protocol):
             self.writing = False
 
     def play(self):
-        subprocess.run(PLAYER_CMD.split() + [BUFFER_PATH],
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # does not need to actually run player for experiment purpose
+        # subprocess.run(PLAYER_CMD.split() + [BUFFER_PATH],
+        #                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        logging.info("Player started.")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logfile = open("player.log", 'w')
+    logging.basicConfig(stream=logfile, level=logging.INFO,
+                        format="%(levelname)s: %(asctime)s; %(message)s")
     if len(sys.argv) == 1:
         print("No input url.")
         exit()
