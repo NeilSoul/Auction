@@ -174,6 +174,7 @@ class Server:
                 # TODO: device-specific parameters to cost function
                 self.auction()
             else:
+                logging.info("Starting new auction.")
                 self.control.broadcast_idle()
                 self.loop.call_later(BROADCAST_IDLE_INTERVAL,
                                      self.broadcast_idle)
@@ -202,12 +203,12 @@ class Server:
         else:
             winner, second = sorted(bidders, key=score, reverse=True)[:2]
         payment = score(second) + cost(info[winner][0])
+        logging.info("Winner: %s, payment: %d." % (winner, payment))
         for bidder in bidders:
             if bidder is winner:
                 self.control.sendto("SUCCESS:" + str(payment), bidder)
             else:
                 self.control.sendto("FAILURE", bidder)
-        logging.info("Aunction done.")
         self.reset_aunction()
 
     def reset_aunction(self):
@@ -217,7 +218,9 @@ class Server:
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    logging.basicConfig(level=logging.INFO)
+    logfile = open("server.log", 'w')
+    logging.basicConfig(stream=logfile, level=logging.INFO,
+                        format="%(levelname)s: %(asctime)s; %(message)s")
     server = Server(loop)
     for coro in server.coros:
         loop.run_until_complete(coro)
