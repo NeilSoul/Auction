@@ -70,7 +70,7 @@ class Player(asyncio.Protocol):
         self.loop = loop
         self.infolist = infolist
         self.idx_stack = deque(range(len(infolist)))
-        self.idx_pending = None
+        self.idx_pending = deque()
         self.buflist = [None] * len(infolist)
 
         self.write_idx = 0
@@ -87,11 +87,11 @@ class Player(asyncio.Protocol):
     def data_received(self, data):
         data = data.decode()
         if data == "IDLE":
-            self.idx_pending = self.idx_stack.popleft()
-            self.transport.write(repr(infolist[self.idx_pending]).encode())
+            if not self.idx_pending:
+                self.idx_pending.append(self.idx_stack.popleft())
+            self.transport.write(repr(infolist[self.idx_pending[0]]).encode())
         elif data == "FAILURE":
-            self.idx_stack.appendleft(self.idx_pending)
-            self.idx_pending = None
+            self.idx_stack.appendleft(self.idx_pending.popleft())
         else:
             # success
             proxy_ip, rate_str = data.split(',')[1:]
@@ -100,13 +100,12 @@ class Player(asyncio.Protocol):
 
     @asyncio.coroutine
     def proxy_dl(self, proxy_ip):
-        url = self.infolist[self.idx_pending][1][self.rate]
+        idx = self.idx_pending.popleft()
+        url = self.infolist[idx][1][self.rate]
         yield from self.loop.create_connection(
-            lambda: ProxyDownloader(self, url, self.buflist,
-                                    self.idx_pending),
+            lambda: ProxyDownloader(self, url, self.buflist, idx),
             proxy_ip, PROXY_PORT
         )
-        self.idx_pending = None
         self.check_complete()
 
     @asyncio.coroutine
