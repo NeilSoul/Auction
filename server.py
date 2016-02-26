@@ -1,13 +1,17 @@
 import asyncio
 import logging
 import re
+import socket
+import random
+import string
 from algorithm import utility, cost
 
 
 CONTROL_PORT = 7000
 PLAYER_PORT = 7001
 PROXY_PORT = 7002
-BC_INTERVAL = 1.0
+BROADCAST_IP = "192.168.1.255"
+BROADCAST_IDLE_INTERVAL = 1.0
 
 
 class PlayerHandler(asyncio.Protocol):
@@ -33,38 +37,55 @@ class PlayerHandler(asyncio.Protocol):
     def connection_lost(self, _):
         self.factory.player = None
         self.factory.idle = True
-        self.factory.broadcast()
+        self.factory.broadcast_idle()
         logging.info("Player disconnected.")
 
 
-class Control(asyncio.Protocol):
+class UDPControl(asyncio.Protocol):
     """Handle a single connection from/to a peer."""
+
     def __init__(self, factory):
         self.factory = factory
+        self.broadcast_addr = (BROADCAST_IP, CONTROL_PORT)
+        self.rand_str = ''.join([random.choice(string.ascii_letters)
+                                 for _ in range(10)])
+        # self.broadcast("ECHO" + self.rand_string)
 
     def connection_made(self, transport):
+        self.factory.control = self
         self.transport = transport
-        self.factory.peers.append(self)
-        self.peername = transport.get_extra_info("peername")
-        logging.info("Connected to peer %s." % self.peername[0])
+        sock = transport.get_extra_info("socket")
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        logging.info("Listening UDP.")
 
-    def data_received(self, data):
+    def datagram_received(self, data, addr):
+        ip = addr[0]
         data = data.decode()
         if data == "FAILURE":
             logging.info("Bid failed.")
             self.factory.write_player(data)
-        elif data == "IDLE":
-            self.factory.auctioneer = self
-            self.factory.write_player(data)
+        elif data.startswith("IDLE"):
+            if data.split(':')[1] != self.rand_str:
+                logging.info("Received offer from %s" % ip)
+                self.factory.auctioneer = ip
+                self.factory.write_player("IDLE")
         elif data.startswith("SUCCESS"):
             logging.info("Bid succeeded.")
-            success, payment = data.split(':')
+            success, payment = data.split(':', 1)
             # TODO: billing system
-            msg = ','.join((success, self.peername[0], str(self.factory.rate)))
+            msg = ','.join((success, ip, str(self.factory.rate)))
             self.factory.write_player(msg)
-        else:
+        elif data.startswith("BID"):
             # map this Control instance to its bid info
-            self.factory.bid_info[self] = eval(data)
+            self.factory.bid_info[ip] = eval(data.split(':', 1)[1])
+
+    def broadcast_idle(self):
+        self.transport.sendto(("IDLE:" + self.rand_str).encode(),
+                              self.broadcast_addr)
+
+    def sendto(self, data, ip):
+        self.transport.sendto(data.encode(), (ip, CONTROL_PORT))
 
     def connection_lost(self, _):
         self.factory.peers.remove(self)
@@ -73,6 +94,7 @@ class Control(asyncio.Protocol):
 
 class HTTPClient(asyncio.Protocol):
     """Fetch video segment."""
+
     def __init__(self, proxy):
         self.proxy = proxy
         self.factory = proxy.factory
@@ -93,6 +115,7 @@ class HTTPClient(asyncio.Protocol):
 
 class Proxy(asyncio.Protocol):
     """Fetch video segment."""
+
     def __init__(self, factory):
         self.factory = factory
 
@@ -121,45 +144,48 @@ class Proxy(asyncio.Protocol):
 
 
 class Server:
+
     def __init__(self, loop):
         self.loop = loop
 
-        self.peers = []
+        self.control = None
         self.player = None
         self.idle = True
 
         # TODO: integrate with initialization module
         self.coros = []
-        self.coros.append(self.loop.create_server(lambda: Control(self),
-                                                    "0.0.0.0", CONTROL_PORT))
+        self.coros.append(self.loop.create_datagram_endpoint(
+            lambda: UDPControl(self), ("0.0.0.0", CONTROL_PORT)))
         self.coros.append(self.loop.create_server(lambda: PlayerHandler(self),
-                                               "127.0.0.1", PLAYER_PORT))
+                                                  "127.0.0.1", PLAYER_PORT))
         self.coros.append(self.loop.create_server(lambda: Proxy(self),
                                                   "0.0.0.0", PROXY_PORT))
 
         self.reset_aunction()
-        self.broadcast()
+        self.broadcast_idle()
 
     def write_player(self, data):
         if self.player:
             self.player.transport.write(data.encode())
 
-    def broadcast(self):
+    def broadcast_idle(self):
         """Broadcast 'IDLE' message to all peers at a certain interval."""
-        if self.idle:
+        if self.control is None:
+            self.loop.call_later(BROADCAST_IDLE_INTERVAL, self.broadcast_idle)
+        elif self.idle:
             if self.bid_info:
                 self.auction()
             else:
-                for peer in self.peers:
-                    # TODO: device-specific parameters to cost function
-                    peer.transport.write(b"IDLE")
-                self.loop.call_later(BC_INTERVAL, self.broadcast)
+                # TODO: device-specific parameters to cost function
+                self.control.broadcast_idle()
+                self.loop.call_later(BROADCAST_IDLE_INTERVAL,
+                                     self.broadcast_idle)
 
     def bid(self, duration, rate_url_list):
         """Choose a bitrate and send the bid message.
 
-        The message contains url, bitrate, duration, price,
-        separated by ','.
+        The message starts with "BID:",
+        followed by (url, bitrate, duration, price).
         """
         logging.info("Starting bid.")
         rates = rate_url_list.keys()
@@ -168,7 +194,7 @@ class Server:
         url = rate_url_list[self.rate]
         price = utility(self.rate, duration)
         msg = repr((url, self.rate, duration, price))
-        self.auctioneer.transport.write(msg.encode())
+        self.control.sendto("BID:" + msg, self.auctioneer)
 
     def auction(self):
         """Choose a winner, inform all bidders, and reset auction state."""
@@ -184,9 +210,9 @@ class Server:
         payment = score(second) + cost(*info[winner][1:3])
         for bidder in bidders:
             if bidder is winner:
-                bidder.transport.write(("SUCCESS:" + str(payment)).encode())
+                self.control.sendto("SUCCESS:" + str(payment), bidder)
             else:
-                bidder.transport.write(b"FAILURE")
+                self.control.sendto("FAILURE", bidder)
         logging.info("Aunction done.")
         self.reset_aunction()
 
