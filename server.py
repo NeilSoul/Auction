@@ -110,7 +110,7 @@ class HTTPClient(asyncio.Protocol):
         self.proxy.transport.close()
         if not self.factory.player:
             self.factory.idle = True
-            self.factory.broadcast()
+            self.factory.broadcast_idle()
 
 
 class Proxy(asyncio.Protocol):
