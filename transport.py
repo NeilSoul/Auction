@@ -1,4 +1,10 @@
 #!usr/bin/env python
+"""TODO
+join or not join
+write index on data, no save at auctioneer
+because maybe multi sock at one ..
+"""
+
 import socket
 import select
 import threading
@@ -9,26 +15,24 @@ import log
 FILE_BOF = 'B'.encode()
 FILE_SEP = '#'.encode()
 
-class FManager(object):
-	@staticmethod 
-	def start(filepath):
-		try:
-			fd = open(filepath, 'w')
-			fd.close()
-		except:
-			log.log_trp('file create error', filepath)
+""" 
+Transport Protocol
+"""
+class Protocol(object):
+	def on_receive_success(self, index, list, address):
+		pass
+	def on_receive_failure(self, index, list, address):
+		pass
+	def on_send_success(self, index):
+		pass
+	def on_send_failure(self, index):
+		pass
 
-	@staticmethod
-	def append(data, filepath):
-		try:
-			fd = open(filepath, 'ab')
-			fd.write(data)
-			fd.close()
-		except:
-			log.log_trp('file append error', filepath)
-
+"""
+Transport
+"""
 class Transport(object):
-	def __init__(self, host, port, dname, callback):
+	def __init__(self, host, port, protocol):
 		self.running = True 
 		#create a socket
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -36,44 +40,47 @@ class Transport(object):
 		#set option reused
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR  , 1)
 		self.server_address= (host,port)
-		self.port = port
 		self.server.bind(self.server_address)
 		self.server.listen(10)
 
 		self.inputs = [self.server]
-		# (socket : filepath)
-		self.files = {}
+		#buffer indexs (socket : buffer index)
+		self.indexs = {}
+		#buffer lists (socket : list)
+		self.lists = {}
 
 		#A optional parameter for select is TIMEOUT
-		self.timeout = 5
-		self.folder_path = dname
-		self.callback = callback
+		self.timeout = 3
+
+		#Protocol 
+		self.protocol = protocol
 
 	'Server Methods'
 	def transport_made(self, sock, data):
 		sep = data.find(FILE_SEP)
-		file_name = data[1:sep].decode()
-		file_path = os.path.join(self.folder_path, file_name)
-		self.files[sock] = file_path
-		FManager.start(file_path)
-		FManager.append(data[sep+1:], file_path)
-		return
+		index = data[1:sep].decode()
+		self.indexs[sock] = index
+		self.lists[sock] = []
+		self.lists[sock].append(data[sep+1:])
 
-	def transport_clear(self, sock):
-		if sock in self.files:
-			self.callback(sock.getpeername(), self.files[sock])
-			del self.files[sock]
+	def transport_clear(self, sock, sucess=True):
+		if sock in self.lists:
+			if sucess:
+				self.protocol.on_receive_success(self.indexs[sock], self.lists[sock], sock.getpeername())
+			else:
+				self.protocol.on_receive_failure(self.indexs[sock], self.lists[sock], sock.getpeername())
+			del self.indexs[sock]
+			del self.lists[sock]
 		if sock in self.inputs:
 			self.inputs.remove(sock)
 		sock.close()
 
 	def receive(self, sock, data):
-		if not sock in self.files:
+		if not sock in self.lists:
 			if data.startswith(FILE_BOF):
 				self.transport_made(sock, data)
 		else:
-			file_path = self.files[sock]
-			FManager.append(data, file_path)
+			self.lists[sock].append(data)
 
 	def listen(self):
 		while self.running and self.inputs:
@@ -84,8 +91,7 @@ class Transport(object):
 			# When timeout reached , select return three empty lists
 			if not (readable or writable or exceptional) :
 				#log.log_trp("Time out ! ")
-				continue
-				#break;    
+				continue 
 			for s in readable :
 				if s is self.server:
 				    # A "readable" socket is ready to accept a connection
@@ -105,28 +111,8 @@ class Transport(object):
 			for s in exceptional:
 				#log.log_trp("exception condition on ", s.getpeername())
 				#stop listening for input on the connection
-				self.transport_clear(s)
+				self.transport_clear(s, False)
 		self.server.close()
-
-	'Client Methods'
-	def transport(self, ip, filename, data_from_url):
-		# connect to sock
-		try:
-			sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-			sock.connect((ip, self.port))
-			data = FILE_BOF + filename.encode() + FILE_SEP
-			sock.sendall(data)
-			# http task
-			f = urllib2.urlopen(data_from_url)
-			while True:
-				data = f.read(1024)
-				if not data:
-					break
-				sock.send(data)
-				#log.log_trp('downloading...', len(data))
-			sock.close()
-		except:
-			log.log_trp('transport error')
 
 	'Loop Methods'
 	def start(self):
@@ -138,13 +124,35 @@ class Transport(object):
 
 	def close(self):
 		self.running = False
-		#trick to active select. (without timeout)
-		sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-		sock.connect(self.server_address)
 
-def callback(from_address, file_path):
-	print from_address, file_path
+"""Sender
+"""
+class Sender(object):
+	def __init__(self, port, protocol):
+		self.port = port
+		self.protocol = protocol
 
-if __name__ == "__main__":
-	transport_center = Transport('0.0.0.0', 9002, './O', callback)
-	transport_center.start()
+	def transport(self, ip, index, from_url):
+		# connect to sock
+		try:
+			sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+			sock.connect((ip, self.port))
+			data = FILE_BOF + str(index) + FILE_SEP
+			sock.sendall(data)
+			# http task
+			f = urllib2.urlopen(from_url)
+			while True:
+				data = f.read(1024)
+				if not data:
+					break
+				sock.send(data)
+			sock.close()
+			self.protocol.on_send_success(index)
+		except:
+			log.log_trp('transport error')
+			self.protocol.on_send_failure(index)
+
+	def ttransport(self, ip, index, from_url):
+		t = threading.Thread(target=self.sendto, args=(ip,index,from_url))
+		t.start()
+
