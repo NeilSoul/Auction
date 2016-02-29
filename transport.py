@@ -17,21 +17,24 @@ FILE_SEP = '#'.encode()
 
 """ 
 Transport Protocol
+Include server and client.
 """
 class Protocol(object):
-	def on_receive_success(self, index, list, address):
+	''' server callback '''
+	def receive_successed(self, index, list, address):
 		pass
-	def on_receive_failure(self, index, list, address):
+	def receive_failed(self, index, list, address):
 		pass
-	def on_send_success(self, index):
+	''' client callback '''
+	def send_successed(self, index):
 		pass
-	def on_send_failure(self, index):
+	def send_failed(self, index):
 		pass
 
 """
-Transport
+Transport Server
 """
-class Transport(object):
+class TransportServer(object):
 	def __init__(self, host, port, protocol):
 		self.running = True 
 		#create a socket
@@ -66,9 +69,9 @@ class Transport(object):
 	def transport_clear(self, sock, sucess=True):
 		if sock in self.lists:
 			if sucess:
-				self.protocol.on_receive_success(self.indexs[sock], self.lists[sock], sock.getpeername())
+				self.protocol.receive_successed(self.indexs[sock], self.lists[sock], sock.getpeername())
 			else:
-				self.protocol.on_receive_failure(self.indexs[sock], self.lists[sock], sock.getpeername())
+				self.protocol.receive_failed(self.indexs[sock], self.lists[sock], sock.getpeername())
 			del self.indexs[sock]
 			del self.lists[sock]
 		if sock in self.inputs:
@@ -90,13 +93,11 @@ class Transport(object):
 				break
 			# When timeout reached , select return three empty lists
 			if not (readable or writable or exceptional) :
-				#log.log_trp("Time out ! ")
 				continue 
 			for s in readable :
 				if s is self.server:
 				    # A "readable" socket is ready to accept a connection
 				    connection, client_address = s.accept()
-				    #log.log_trp("connection from ", client_address)
 				    connection.setblocking(0)
 				    self.inputs.append(connection)
 				else:
@@ -105,11 +106,9 @@ class Transport(object):
 				    	self.receive(s, data)
 				    else:
 				        #Interpret empty result as closed connection
-				        #log.log_trp("complete", s.getpeername())
 				        self.transport_clear(s)
 			 
 			for s in exceptional:
-				#log.log_trp("exception condition on ", s.getpeername())
 				#stop listening for input on the connection
 				self.transport_clear(s, False)
 		self.server.close()
@@ -125,13 +124,15 @@ class Transport(object):
 	def close(self):
 		self.running = False
 
-"""Sender
 """
-class Sender(object):
+Transport Client
+"""
+class TransportClient(object):
 	def __init__(self, port, protocol):
 		self.port = port
 		self.protocol = protocol
 
+	# block function
 	def transport(self, ip, index, from_url):
 		# connect to sock
 		try:
@@ -147,11 +148,11 @@ class Sender(object):
 					break
 				sock.send(data)
 			sock.close()
-			self.protocol.on_send_success(index)
+			self.protocol.send_successed(index)
 		except:
-			log.log_trp('transport error')
-			self.protocol.on_send_failure(index)
+			self.protocol.send_failed(index)
 
+	# thread function
 	def ttransport(self, ip, index, from_url):
 		t = threading.Thread(target=self.sendto, args=(ip,index,from_url))
 		t.start()
