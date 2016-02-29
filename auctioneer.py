@@ -35,7 +35,8 @@ class TransportProtocol(transport.Protocol):
 	def on_receive_success(self, index, list, address):
 		ip = address[0]
 		data = b''.join(list)
-		self.factory.receive_trunk(ip, eval(index), data)
+		threading.Thread(target=self.factory.receive_trunk, args=(ip, eval(index), data)).start()
+		#self.factory.receive_trunk(ip, eval(index), data)
 	def on_receive_failure(self, index, list, address):
 		ip = address[0]
 		self.factory.fail_trunk(ip, eval(index))
