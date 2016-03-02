@@ -84,7 +84,7 @@ class MessageClient(object):
 			except:
 				self.protocol.send_failed(next_msg, next_ip)
 		self.sender.close()
-		del self.message_queue
+		#del self.message_queue
 
 	def sendto(self, ip, message):
 		self.message_queue.put((message, ip))

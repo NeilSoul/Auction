@@ -8,6 +8,7 @@ because maybe multi sock at one ..
 import socket
 import select
 import threading
+import time
 import urllib2
 import os
 import log
@@ -132,13 +133,16 @@ class TransportClient(object):
 		self.port = port
 		self.protocol = protocol
 
-	# block function
+	# block function, return size, duration
 	def transport(self, ip, index, from_url):
 		# connect to sock
+		data_length = 0
+		tbegin = time.time()
 		try:
 			sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 			sock.connect((ip, self.port))
 			data = FILE_BOF + str(index) + FILE_SEP
+			data_length += len(data)
 			sock.sendall(data)
 			# http task
 			f = urllib2.urlopen(from_url)
@@ -147,10 +151,13 @@ class TransportClient(object):
 				if not data:
 					break
 				sock.send(data)
+				data_length += len(data)
 			sock.close()
 			self.protocol.send_successed(index)
 		except:
 			self.protocol.send_failed(index)
+		tend = time.time()
+		return data_length, tend-tbegin#data_length /(tend - tbegin)/1024/1024
 
 	# thread function
 	def ttransport(self, ip, index, from_url):
