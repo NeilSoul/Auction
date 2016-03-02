@@ -7,7 +7,7 @@ auction event entry.
 ### auction broadcast
 format
 ```
-#A peer
+#A auctioneer_peer
 timestamp(second)
 segments capacity(Mbps) cti cda cwda
 ```
@@ -21,7 +21,7 @@ example
 ### auction decision
 format
 ```
-#D auction_peer bidder_peer
+#D auctioneer_peer bidder_peer
 timestamp
 segments bitrate payment
 ```
@@ -36,7 +36,7 @@ example
 ### bid
 format
 ```
-#B peer
+#B bidder_peer auction_peer
 timestamp 
 segments
 rate1, rate2, ..., ratek(Mbps)
