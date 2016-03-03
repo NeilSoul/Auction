@@ -93,7 +93,7 @@ class LogServer(object):
 	def bid_send(self, ip, pack):
 		# extract
 		timestamp = time.time()- self.timestart
-		peer, auction_peer, bid = eval(pack)
+		peer, auction_peer, buffer_size, bid = eval(pack)
 		bitrates,prices,gains = bid
 		# mark
 		self.peername[ip] = peer
@@ -103,7 +103,7 @@ class LogServer(object):
 		if not auction_peer in self.bidders[ip] or not self.bidders[ip][auction_peer]:
 			self.loglist(['#B', peer, auction_peer])
 			self.logline(str(timestamp))
-			self.loglist([len(bitrates)])
+			self.loglist([len(bitrates), buffer_size])
 			self.loglist(map(lambda rate:float(rate)/1024/1024,bitrates))
 			self.loglist(prices)
 		self.bidders[ip][auction_peer] = 1
@@ -111,13 +111,13 @@ class LogServer(object):
 	def transport_complete(self, ip, pack):
 		# extract
 		timestamp = time.time() - self.timestart
-		bidder_ip, size, duration = eval(pack)
+		bidder_ip, index, size, duration = eval(pack)
 		from_peer = self.peername[ip]
 		to_peer = self.peername[bidder_ip]
 		# write to file
 		self.loglist(['#T', from_peer, to_peer])
 		self.logline(str(timestamp))
-		self.loglist([float(size)/1024/1024, duration])
+		self.loglist([index, float(size)/1024/1024, duration])
 		
 
 class LogClient(object):
@@ -141,12 +141,12 @@ class LogClient(object):
 	def decide_complete(self, peer):
 		self.send(':'.join(['C',peer]))
 
-	def bid_send(self, peer, auction_peer, bid):
-		pack = str([peer, auction_peer, bid])
+	def bid_send(self, peer, auction_peer, buffer_size, bid):
+		pack = str([peer, auction_peer, buffer_size, bid])
 		self.send(':'.join(['B', pack]))
 
-	def transport_complete(self, bidder_ip, size, duration):
-		pack = str([bidder_ip, size, duration])
+	def transport_complete(self, bidder_ip, index, size, duration):
+		pack = str([bidder_ip, index, size, duration])
 		self.send(':'.join(['T', pack]))
 
 if __name__=="__main__":

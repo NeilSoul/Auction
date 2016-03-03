@@ -38,7 +38,7 @@ format
 ```
 #B bidder_peer auction_peer
 timestamp 
-segments
+segments buffer_size(seconds)
 rate1, rate2, ..., ratek(Mbps)
 price1, price2, ..., pricek
 ```
@@ -46,10 +46,10 @@ price1, price2, ..., pricek
 example
 ```
 #B B A
-5.80487298965
-3
-0.296698570251 0.296698570251 0.296698570251
-17.8943791243 35.3887582487 52.483137373
+41.7679789066
+3 0.0
+0.507960319519 0.507960319519 0.507960319519
+23.6364384564 46.6957243367 69.1778576411
 ```
 
 ### transport
@@ -57,13 +57,13 @@ format
 ```
 #T from_peer to_peer
 timestamp(finished time!)
-segment_size(Mb) transport_duration(sconds)
+segment_index(from 0 to ..) segment_size(Mb) transport_duration(sconds)
 ```
 example
 ```
 #T A B
-11.1779739857
-0.395339012146 0.844485044479
+69.7660508156
+3 0.732047080994 2.04561901093
 ```
 
 ## play.log

@@ -104,7 +104,7 @@ class Auctioneer(object):
 					self.core.estimate_capacity(round(capacity,3))
 					self.tasks[ip] = self.tasks[ip] - 1
 					#logging 
-					self.logger.transport_complete(ip, size, duration)
+					self.logger.transport_complete(ip, index, size, duration)
 					print '[task completed]', index, url
 			except:
 				#Time out

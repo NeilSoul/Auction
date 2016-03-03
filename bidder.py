@@ -156,7 +156,7 @@ class Bidder(object):
 	def bid(self, ip, auction):
 		auction_peer, bid = self.core.handle_auction(auction)
 		if bid:
-			self.logger.bid_send(self.peername, auction_peer, bid)
+			self.logger.bid_send(self.peername, auction_peer, self.buffer_size(), bid)
 			self.message_client.sendto(ip, ':'.join(['BID',str(bid)]))
 
 	def send_task(self, ip, info):

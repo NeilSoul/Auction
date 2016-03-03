@@ -11,6 +11,18 @@ sudo apt-get install mplayer
 sudo pip install m3u8
 ```
 
+energy module:
+```
+apt-get install python-smbus
+sudo vi /boot/config.txt
+```
+```
+# Uncomment some or all of these to enable the optional hardware interfaces
+dtparam=i2c_arm=on
+dtparam=i2s=on
+#dtparam=spi=on
+```
+
 ## Run
 
 auctioneer :

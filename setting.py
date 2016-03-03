@@ -18,7 +18,7 @@ LOG_PORT = 9008
 LOG_DIR = 'log'
 
 # Player Buffer
-PLAYER_DEFAULT_URL = "http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
+PLAYER_DEFAULT_URL = "http://devstreaming.apple.com/videos/wwdc/2015/413eflf3lrh1tyo/413/hls_vod_mvp.m3u8"#"http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
 PLAYER_BUFFER = "video_buffer"
 PLAYER_COMMAND = "mplayer"
 
