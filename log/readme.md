@@ -9,7 +9,7 @@ format
 ```
 #A auctioneer_peer
 timestamp(second)
-segments capacity(Mbps) cti cda cwda
+segments capacity(mbps) cti cda cwda
 ```
 example
 ```
@@ -39,7 +39,7 @@ format
 #B bidder_peer auction_peer
 timestamp 
 segments buffer_size(seconds)
-rate1, rate2, ..., ratek(Mbps)
+rate1, rate2, ..., ratek(mbps)
 price1, price2, ..., pricek
 ```
 
@@ -57,7 +57,7 @@ format
 ```
 #T from_peer to_peer
 timestamp(finished time!)
-segment_index(from 0 to ..) segment_size(Mb) transport_duration(sconds)
+segment_index(from 0 to ..) segment_size(mb) transport_duration(sconds)
 ```
 example
 ```
