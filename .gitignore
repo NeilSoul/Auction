@@ -1,5 +1,5 @@
 *.pyc
 .DS_Store
 video_buffer
-auction.log
+log/auction.log
 
