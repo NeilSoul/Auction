@@ -1,4 +1,5 @@
 #!usr/bin/env python
+## TODO timeout refer to capacity
 import os
 import threading
 import subprocess
@@ -44,7 +45,7 @@ class TransportProtocol(transport.Protocol):
 		
 
 class Bidder(object):
-	def __init__(self, peername, url, silent):
+	def __init__(self, peername, url, silent, bidder_params):
 		# bidder message server
 		self.message_server  = message.MessageServer(
 			setting.UDP_HOST, 
@@ -63,10 +64,11 @@ class Bidder(object):
 		# log center
 		self.logger = log.LogClient(peername)
 		self.logger.add_peer(peername)
-		# init
+		# other properties
 		self.peername = peername
 		self.silent = silent
 		self.streaming_url = url
+		self.bidder_params = bidder_params
 
 	""" Bidder(receiver, player) Life Cycle """
 	def start(self):
@@ -80,15 +82,19 @@ class Bidder(object):
 		self.message_server.join()
 		self.message_client.join()
 		self.transport_center.join()
-		self.stream_simulation.join()
-		self.retrieving_timeout.join()
 
 	def close(self):
 		self.message_server.close()
 		self.message_client.close()
 		self.transport_center.close()
-		self.clear_player()
 		self.running = 0
+		self.retrieving_timeout_cond.acquire()
+		self.retrieving_timeout_cond.notify()
+		self.retrieving_timeout_cond.release()
+		self.played_cond.acquire()
+		self.played_cond.notify()
+		self.played_cond.release()
+		self.clear_player()
 
 	""" Player Methods"""
 	def prepare2play(self, url):
@@ -116,15 +122,15 @@ class Bidder(object):
 		print 'rates', map(lambda r:float(r)/1024/1024, self.rate_list)
 		# streaming engine
 		self.played_queue = Queue() # [(index, bytes_of_data)]
-		self.stream_simulation = threading.Thread(target = self.streaming)
-		self.stream_simulation.start()
+		self.played_cond = threading.Condition()
+		threading.Thread(target = self.streaming).start()
 		# timeout protection
-		self.retrieving_timeout = threading.Thread(target=self.time_trunk, args=(setting.AUCTIONEER_DOWNLOAD_TIMEOUT,))
-		self.retrieving_timeout.start()
+		self.retrieving_timeout_cond = threading.Condition()
+		threading.Thread(target=self.time_trunk, args=(setting.AUCTIONEER_DOWNLOAD_TIMEOUT,)).start()
 		# clear player
 		self.clear_player()
 		# core
-		self.core = BidderCore(self)
+		self.core = BidderCore(self, self.bidder_params)
 
 	def clear_player(self):
 		try:
@@ -133,14 +139,23 @@ class Bidder(object):
 			pass
 
 	def streaming(self):
+		rebuffer = 0
+		rebuffer_mark = time.time()
 		while self.running:
 			try:
 				index, bytes = self.played_queue.get(timeout=1)
 			except:
 				continue
+			# record rebuffer
+			rebuffer += time.time() -rebuffer_mark
 			duration = self.descriptor_list[index][0]
-			print '[play]', index, 'duration', duration, 'size', float(bytes)/1024/128
-			time.sleep(duration)
+			print '[play]', index, 'rebuffer', rebuffer, 'duration', duration
+			#time.sleep(duration)
+			self.played_cond.acquire()
+			self.played_cond.wait(duration)
+			self.played_cond.release()
+			# mark 
+			rebuffer_mark = time.time()
 			if index >= self.last_index:
 				break 
 
@@ -179,7 +194,7 @@ class Bidder(object):
 
 	""" Transport Factory """
 	def receive_trunk(self, ip, index, data):
-		print '[received]', index
+		print '[received]', index, 'size', float(len(data))/1024/128
 		# discard wild data
 		if not index in self.retrieving: 
 			return
@@ -209,24 +224,38 @@ class Bidder(object):
 		self.wait_for_auction.put(index)
 
 	def time_trunk(self, timeout):
+		self.retrieving_timeout_cond
 		while self.running:
 			now = time.time()
 			for index in self.retrieving:#TODO thread safe
 				if self.retrieving[index] - now > timeout:
 					del self.retrieving[index]
 					self.wait_for_auction.put(index)
-			time.sleep(timeout)
+			#time.sleep(timeout)
+			self.retrieving_timeout_cond.acquire()
+			self.retrieving_timeout_cond.wait(timeout)
+			self.retrieving_timeout_cond.release()
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Bidder')
 	parser.add_argument('-p','--peer', required=False, default='Peer', help='name of peer')
 	parser.add_argument('-u','--url', required=False, default=setting.PLAYER_DEFAULT_URL, help='url to play')
 	parser.add_argument('-s','--silent', action='store_true', help='not play video actually')
-	return parser.parse_args()
+	parser.add_argument('-t','--theta', default=setting.BIDDER_BASIC_TH, type=float, help='bidder preference theta')
+	parser.add_argument('-q','--quality', default=setting.BIDDER_K_QV, type=float, help='bidder quality coefficient')
+	parser.add_argument('-b','--buffer', default=setting.BIDDER_K_BUF, type=float, help='bidder buffer coefficient')
+	parser.add_argument('-m','--mbuffer', default=setting.BIDDER_MAX_BUF, type=float, help='bidder max buffer')
+	args = parser.parse_args()
+	bidder_params = {}
+	bidder_params['theta'] = args.theta
+	bidder_params['kqv'] = args.quality
+	bidder_params['kbuf'] = args.buffer 
+	bidder_params['mbuf'] = args.mbuffer
+	return args.peer, args.url, args.silent, bidder_params
 
 if __name__ == "__main__":
-	args = parse_args()
-	bidder  = Bidder(args.peer, args.url, args.silent)
+	peer, url, silent, bidder_params = parse_args()
+	bidder  = Bidder(peer, url, silent, bidder_params)
 	bidder.start()
 	try:
 		while True:

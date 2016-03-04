@@ -1,21 +1,19 @@
 #!usr/bin/env python
+import setting 
 import math
-# M paramters
-BIDDER_BASIC_TH = 1.0 # basic preference
-BIDDER_MAX_BUF = 50 # maximum buffer size
-BIDDER_K_QV = 0.1
-BIDDER_K_BUF = 0.002
 
-# TODO thread safe
+# TODO thread safe (dict)
 class BidderCore(object):
-	def __init__(self, factory):
+	""" init with factory pattern , bider_params {param : values}"""
+	def __init__(self, factory, bidder_params):
 		self.factory = factory
 		# M parameters
-		self.valuation_kqv = BIDDER_K_QV
-		self.valuation_kbuf = BIDDER_K_BUF
+		self.basic_preference = setting.BIDDER_BASIC_TH if not 'theta' in bidder_params else bidder_params['theta']
+		self.valuation_kqv = setting.BIDDER_K_QV if not 'kqv' in bidder_params else bidder_params['kqv']
+		self.valuation_kbuf = setting.BIDDER_K_BUF if not 'kbuf' in bidder_params else bidder_params['kbuf']
+		self.max_buffer_size = setting.BIDDER_MAX_BUF if not 'mbuf' in bidder_params else bidder_params['mbuf']
 		self.current_buffer_size = 0
 		self.previous_bitrate = 0
-		self.max_buffer_size = BIDDER_MAX_BUF
 		# valuation
 		self.valuation = {}
 		val = 1
@@ -70,7 +68,7 @@ class BidderCore(object):
 
 	# preference
 	def preference(self):
-		return BIDDER_BASIC_TH + self.factory.buffer_size() / self.max_buffer_size
+		return self.basic_preference + self.factory.buffer_size() / self.max_buffer_size
 
 # unit test
 if __name__=="__main__":

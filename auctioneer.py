@@ -45,10 +45,10 @@ class TransportProtocol(transport.Protocol):
 
 class Auctioneer(object):
 
-	def __init__(self, peername, segmentnumber):
+	def __init__(self, peername, auctioneer_params):
 		# propertys
 		self.peername = peername
-		self.segment_number = segmentnumber
+		self.auctioneer_params = auctioneer_params
 		# auction message server
 		self.message_server  = message.MessageServer(
 			setting.UDP_HOST, 
@@ -67,7 +67,7 @@ class Auctioneer(object):
 		self.logger = log.LogClient(peername)
 		self.logger.add_peer(peername)
 		# algorithm core
-		self.core = AuctioneerCore(self)
+		self.core = AuctioneerCore(self, self.auctioneer_params)
 
 	""" Auctioneer Life Cycle"""
 	def start(self):
@@ -120,7 +120,12 @@ class Auctioneer(object):
 	"""
 	def auction(self):
 		# logging
-		self.logger.auction_broadcast(self.peername, self.segment_number, self.core.capacity, self.core.cti, self.core.cda, self.core.cwda)
+		self.logger.auction_broadcast(self.peername, 
+			self.auctioneer_params['segment'], 
+			self.auctioneer_params['capacity'], 
+			self.auctioneer_params['timecost'], 
+			self.auctioneer_params['cellular'], 
+			self.auctioneer_params['wifi'])
 		self.bids.clear()
 		auction_info = ':'.join(['AUCTION',self.core.auction_message()])
 		self.message_client.broadcast(auction_info)
@@ -152,11 +157,22 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='Auctioneer')
 	parser.add_argument('-p', '--peer', required=False, default='Peer', help='name of peer')
 	parser.add_argument('-s', '--segment', type=int, default=setting.AUCTIONEER_SEG_NUM, help='segments per auction')
-	return parser.parse_args()
+	parser.add_argument('-c', '--capacity', type=float, default=setting.AUCTIONEER_DEFAULT_CAPACITY, help='initial capacity')
+	parser.add_argument('-t', '--timecost', type=float, default=setting.AUCTIONEER_COST_TI, help='rebuffer time cost coefficient')
+	parser.add_argument('-l', '--lte', type=float, default=setting.AUCTIONEER_COST_DA, help='lte cost coefficient')
+	parser.add_argument('-w', '--wifi', type=float, default=setting.AUCTIONEER_COST_WDA, help='WiFi cost coefficient')
+	args = parser.parse_args()
+	auctioneer_params = {}
+	auctioneer_params['segment'] = args.segment
+	auctioneer_params['capacity'] = args.capacity
+	auctioneer_params['timecost'] = args.timecost
+	auctioneer_params['cellular'] = args.lte
+	auctioneer_params['wifi'] = args.wifi
+	return args.peer, auctioneer_params
 
 if __name__ == "__main__":
-	args = parse_args()
-	auctioneer  = Auctioneer(args.peer, args.segment)
+	peer, auctioneer_params = parse_args()
+	auctioneer  = Auctioneer(peer, auctioneer_params)
 	auctioneer.start()
 	try:
 		while True:

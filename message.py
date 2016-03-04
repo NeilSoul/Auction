@@ -23,7 +23,7 @@ Message Server & Message Client
 """
 class MessageServer(object):
 	def __init__(self, host, port, protocol):
-		self.running = True 
+		self.running = 1 
 		#create a listenning socket
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.server.setblocking(False)
@@ -32,8 +32,8 @@ class MessageServer(object):
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 		self.server_address= (host,port)
 		self.server.bind(self.server_address)
-		#A optional parameter for select is TIMEOUT
-		self.timeout = 3
+		#A optional parameter for select  is TIMEOUT
+		self.timeout = 1
 		#Protocol of message
 		self.protocol = protocol 
 
@@ -61,11 +61,11 @@ class MessageServer(object):
 		self.listenThread.join()
 
 	def close(self):
-		self.running = False
+		self.running = 0
 
 class MessageClient(object):
 	def __init__(self, broadcast, port, protocol):
-		self.running = True
+		self.running = 1
 		#create a sending socket
 		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
@@ -73,12 +73,18 @@ class MessageClient(object):
 		self.port = port
 		#Outgoing message queue
 		self.message_queue = Queue.Queue()
+		#A optional parameter for  queue is TIMEOUT
+		self.timeout = 1
 		#Protocol of message
 		self.protocol = protocol 
 
 	def message(self):
 		while self.running:
-			next_msg, next_ip = self.message_queue.get()
+			try:
+				next_msg, next_ip = self.message_queue.get(timeout=self.timeout)
+			except:
+				# When timeout reached , Queue raise an Empty Error
+				continue
 			try:
 				self.sender.sendto(next_msg, (next_ip, self.port))
 			except:
@@ -100,5 +106,5 @@ class MessageClient(object):
 		self.messageThread.join()
 
 	def close(self):
-		self.running = False
-		self.message_queue.put(("EXIT", "ERROR_IP"))#important!
+		self.running = 0
+		#self.message_queue.put(("EXIT", "ERROR_IP"))#important!

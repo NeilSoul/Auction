@@ -1,21 +1,17 @@
 #!usr/bin/env python
-# M parameters
-AUCTIONEER_DEFAULT_CAPACITY = 1 # default capacity
-AUCTIONEER_COST_TI = 0.15 # cost coefficients
-AUCTIONEER_COST_DA = 0.15
-AUCTIONEER_COST_WDA = 0.01
 
 class AuctioneerCore(object):
-	def __init__(self, factory):
-		self.segment_number = factory.segment_number
-		self.capacity = AUCTIONEER_DEFAULT_CAPACITY
-		self.cti = AUCTIONEER_COST_TI
-		self.cda = AUCTIONEER_COST_DA
-		self.cwda = AUCTIONEER_COST_WDA
+	def __init__(self, factory, auctioneer_params):
+		self.segment_number = auctioneer_params['segment']
+		self.default_capacity = auctioneer_params['capacity']
+		self.capacity = self.default_capacity
+		self.cti = auctioneer_params['timecost']
+		self.cda = auctioneer_params['cellular']
+		self.cwda = auctioneer_params['wifi']
 		self.factory = factory
 
 	def estimate_capacity(self, capacity):
-		self.capacity = capacity if capacity > 0 else AUCTIONEER_DEFAULT_CAPACITY
+		self.capacity = capacity if capacity > 0 else self.default_capacity
 
 	def auction_message(self):
 		inst = 'AUCTION'

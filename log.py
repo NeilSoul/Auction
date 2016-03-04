@@ -64,7 +64,7 @@ class LogServer(object):
 	def loglist(self, list):
 		self.logline(' '.join(map(lambda x:str(x), list)))
 
-	def mark_peer(self, pack):
+	def mark_peer(self, ip, pack):
 		self.peername[ip] = pack
 
 	def auction_broadcast(self, ip, pack):
@@ -140,7 +140,7 @@ class LogClient(object):
 		self.sender.sendto(message, self.sender_address)
 
 	def add_peer(self, peer):
-		self.send(':'.join['P', peer])
+		self.send(':'.join(['P', peer]))
 
 	def auction_broadcast(self, peer, k, capacity, cti, cda, cwda):
 		pack = str([peer, k, capacity, cti, cda, cwda])

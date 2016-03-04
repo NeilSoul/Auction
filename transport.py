@@ -37,7 +37,7 @@ Transport Server
 """
 class TransportServer(object):
 	def __init__(self, host, port, protocol):
-		self.running = True 
+		self.running = 1 
 		#create a socket
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.server.setblocking(False)
@@ -123,7 +123,7 @@ class TransportServer(object):
 		self.listenThread.join()
 
 	def close(self):
-		self.running = False
+		self.running = 0
 
 """
 Transport Client
@@ -145,7 +145,7 @@ class TransportClient(object):
 			sock.sendall(data)
 			# http task
 			f = urllib2.urlopen(from_url)
-			while True:
+			while 1:
 				data = f.read(1024)
 				if not data:
 					break
