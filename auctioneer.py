@@ -48,6 +48,7 @@ class Auctioneer(object):
 	def __init__(self, peername, auctioneer_params):
 		# propertys
 		self.peername = peername
+		self.delay = auctioneer_params['delay'] if auctioneer_params['delay'] > 1.0 else 1.0
 		self.auctioneer_params = auctioneer_params
 		# auction message server
 		self.message_server  = message.MessageServer(
@@ -56,7 +57,7 @@ class Auctioneer(object):
 			AuctionProtocol(self))
 		# auction sender
 		self.message_client = message.MessageClient(
-			setting.UDP_BROADCAST,
+			self.auctioneer_params['broadcast'],
 			setting.UDP_BID_PORT,
 			message.Protocol())
 		# transport center
@@ -64,7 +65,7 @@ class Auctioneer(object):
 			setting.TRP_PORT,
 			TransportProtocol(self))
 		# log center
-		self.logger = log.LogClient(peername)
+		self.logger = log.LogClient(peername, self.auctioneer_params['broadcast'])
 		self.logger.add_peer(peername)
 		# algorithm core
 		self.core = AuctioneerCore(self, self.auctioneer_params)
@@ -101,12 +102,17 @@ class Auctioneer(object):
 				if self.tasks[ip] > 0:
 					index, url = task.split(',',1)
 					size, duration = self.transport.transport(ip, index, url)
-					capacity = size/duration/1024/1024 if duration > 0 else setting.AUCTIONEER_DEFAULT_CAPACITY
+					#delay
+					if self.delay > 1.0:
+						#print 'delay', duration  * (self.delay - 1.0)
+						time.sleep(duration * (self.delay - 1.0))
+						duration = duration * self.delay
+					capacity = float(size)/duration/1024/1024 if duration > 0 else self.auctioneer_params['capacity']
 					self.core.estimate_capacity(round(capacity,3))
 					self.tasks[ip] = self.tasks[ip] - 1
 					#logging 
 					self.logger.transport_complete(ip, index, size, duration)
-					print '[task completed]', index, float(size)/1024/128, url
+					print '[task completed]', index, round(float(size)/1024/128,3), round(capacity,3), url
 			except:
 				#Time out
 				self.auction()
@@ -122,7 +128,7 @@ class Auctioneer(object):
 		# logging
 		self.logger.auction_broadcast(self.peername, 
 			self.auctioneer_params['segment'], 
-			self.auctioneer_params['capacity'], 
+			self.core.capacity, 
 			self.auctioneer_params['timecost'], 
 			self.auctioneer_params['cellular'], 
 			self.auctioneer_params['wifi'])
@@ -161,6 +167,8 @@ def parse_args():
 	parser.add_argument('-t', '--timecost', type=float, default=setting.AUCTIONEER_COST_TI, help='rebuffer time cost coefficient')
 	parser.add_argument('-l', '--lte', type=float, default=setting.AUCTIONEER_COST_DA, help='lte cost coefficient')
 	parser.add_argument('-w', '--wifi', type=float, default=setting.AUCTIONEER_COST_WDA, help='WiFi cost coefficient')
+	parser.add_argument('-d', '--delay', type=float, default=1.0, help='delay of data transport.')
+	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
 	auctioneer_params = {}
 	auctioneer_params['segment'] = args.segment
@@ -168,6 +176,8 @@ def parse_args():
 	auctioneer_params['timecost'] = args.timecost
 	auctioneer_params['cellular'] = args.lte
 	auctioneer_params['wifi'] = args.wifi
+	auctioneer_params['delay'] = args.delay
+	auctioneer_params['broadcast'] = args.broadcast
 	return args.peer, auctioneer_params
 
 if __name__ == "__main__":

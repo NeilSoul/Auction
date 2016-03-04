@@ -13,7 +13,6 @@ TRP_PORT = 9002
 
 # Logger
 LOG_HOST = ''
-LOG_BROADCAST = '192.168.1.255'#'<broadcast>'
 LOG_PORT = 9008
 LOG_DIR = 'log'
 

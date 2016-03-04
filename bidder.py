@@ -53,7 +53,7 @@ class Bidder(object):
 			BidderProtocol(self))
 		# bidder sender
 		self.message_client = message.MessageClient(
-			setting.UDP_BROADCAST,
+			bidder_params['broadcast'],
 			setting.UDP_AUCTION_PORT,
 			message.Protocol())
 		# transport center
@@ -62,7 +62,7 @@ class Bidder(object):
 			setting.TRP_PORT,
 			TransportProtocol(self))
 		# log center
-		self.logger = log.LogClient(peername)
+		self.logger = log.LogClient(peername, bidder_params['broadcast'])
 		self.logger.add_peer(peername)
 		# other properties
 		self.peername = peername
@@ -245,12 +245,14 @@ def parse_args():
 	parser.add_argument('-q','--quality', default=setting.BIDDER_K_QV, type=float, help='bidder quality coefficient')
 	parser.add_argument('-b','--buffer', default=setting.BIDDER_K_BUF, type=float, help='bidder buffer coefficient')
 	parser.add_argument('-m','--mbuffer', default=setting.BIDDER_MAX_BUF, type=float, help='bidder max buffer')
+	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
 	bidder_params = {}
 	bidder_params['theta'] = args.theta
 	bidder_params['kqv'] = args.quality
 	bidder_params['kbuf'] = args.buffer 
 	bidder_params['mbuf'] = args.mbuffer
+	bidder_params['broadcast'] = args.broadcast
 	return args.peer, args.url, args.silent, bidder_params
 
 if __name__ == "__main__":

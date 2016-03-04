@@ -27,12 +27,26 @@ dtparam=i2s=on
 
 Usage of auctioneer :
 ```
-usage: auctioneer.py [-h] [-p PEER] [-s SEGMENT]
+usage: auctioneer.py [-h] [-p PEER] [-s SEGMENT] [-c CAPACITY] [-t TIMECOST]
+                     [-l LTE] [-w WIFI] [-d DELAY] [-a BROADCAST]
+
+Auctioneer
+
 optional arguments:
   -h, --help            show this help message and exit
   -p PEER, --peer PEER  name of peer
   -s SEGMENT, --segment SEGMENT
                         segments per auction
+  -c CAPACITY, --capacity CAPACITY
+                        initial capacity
+  -t TIMECOST, --timecost TIMECOST
+                        rebuffer time cost coefficient
+  -l LTE, --lte LTE     lte cost coefficient
+  -w WIFI, --wifi WIFI  WiFi cost coefficient
+  -d DELAY, --delay DELAY
+                        delay of data transport.
+  -a BROADCAST, --broadcast BROADCAST
+                        udp broadcast address
 ```
 To stop auctioneer : 
 ```
@@ -41,12 +55,26 @@ Ctrl+C or input [exit]
 
 Usage of bidder : 
 ```
-usage: bidder.py [-p PEER] [-u URL] [-s]
+usage: bidder.py [-h] [-p PEER] [-u URL] [-s] [-t THETA] [-q QUALITY]
+                 [-b BUFFER] [-m MBUFFER] [-a BROADCAST]
+
+Bidder
+
 optional arguments:
   -h, --help            show this help message and exit
   -p PEER, --peer PEER  name of peer
   -u URL, --url URL     url to play
   -s, --silent          not play video actually
+  -t THETA, --theta THETA
+                        bidder preference theta
+  -q QUALITY, --quality QUALITY
+                        bidder quality coefficient
+  -b BUFFER, --buffer BUFFER
+                        bidder buffer coefficient
+  -m MBUFFER, --mbuffer MBUFFER
+                        bidder max buffer
+  -a BROADCAST, --broadcast BROADCAST
+                        udp broadcast address
 ```
 To stop auctioneer : 
 ```

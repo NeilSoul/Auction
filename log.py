@@ -132,11 +132,11 @@ class LogServer(object):
 		
 
 class LogClient(object):
-	def __init__(self, code):
+	def __init__(self, code, broadcast):
 		self.code = code
 		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
-		self.sender_address = (setting.LOG_BROADCAST, setting.LOG_PORT)
+		self.sender_address = (broadcast, setting.LOG_PORT)
 
 	def send(self, message):
 		self.sender.sendto(message, self.sender_address)
@@ -164,10 +164,11 @@ class LogClient(object):
 		self.send(':'.join(['T', pack]))
 def parse_args():
 	parser = argparse.ArgumentParser(description='Logger')
-	parser.add_argument('logfile', default='auction.log', help='file name of the log.')
+	parser.add_argument('-l','--logfile', default='auction.log', help='file name of the log.')
 	return parser.parse_args()
 
 if __name__=="__main__":
-	server = LogServer(parse_args().logfile)
+	args = parse_args()
+	server = LogServer(args.logfile)
 	server.run()
 

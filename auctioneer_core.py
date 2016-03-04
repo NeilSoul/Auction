@@ -12,6 +12,7 @@ class AuctioneerCore(object):
 
 	def estimate_capacity(self, capacity):
 		self.capacity = capacity if capacity > 0 else self.default_capacity
+		#print 'estimate', self.capacity
 
 	def auction_message(self):
 		inst = 'AUCTION'
