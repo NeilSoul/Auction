@@ -2,10 +2,12 @@ import os
 import time
 import socket
 import select
+import argparse
 import setting
 
 class LogServer(object):
-	def __init__(self):
+	def __init__(self, filename):
+		self.filename = filename
 		self.server_address = (setting.LOG_HOST, setting.LOG_PORT)
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.server.setblocking(False)
@@ -13,7 +15,7 @@ class LogServer(object):
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 		self.server.bind(self.server_address)
 		self.timeout = 3
-		self.auction = open(os.path.join(setting.LOG_DIR, 'auction.log'), 'w')
+		self.auction = open(os.path.join(setting.LOG_DIR, self.filename), 'w')
 		self.peername = {} # {ip:peer}
 		self.auctioneers = {} # {ip:is auctioning}
 		self.bidders = {} #{ ip :{auction_peer : is bidding}} #TODO multi bidding at begin
@@ -160,8 +162,12 @@ class LogClient(object):
 	def transport_complete(self, bidder_ip, index, size, duration):
 		pack = str([bidder_ip, index, size, duration])
 		self.send(':'.join(['T', pack]))
+def parse_args():
+	parser = argparse.ArgumentParser(description='Logger')
+	parser.add_argument('logfile', default='auction.log', help='file name of the log.')
+	return parser.parse_args()
 
 if __name__=="__main__":
-	server = LogServer()
+	server = LogServer(parse_args().logfile)
 	server.run()
 

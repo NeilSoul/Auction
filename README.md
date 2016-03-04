@@ -55,7 +55,9 @@ Ctrl+C or input [exit]
 
 Run of log :
 ```
-python log.py
+usage: log.py logfile
+positional arguments:
+  logfile     file name of the log.
 ```
 Exit of log :
 ```
