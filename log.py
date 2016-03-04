@@ -79,7 +79,11 @@ class LogServer(object):
 		# extract
 		timestamp = time.time()- self.timestart
 		peer, bidder_ip, segments, bitrate, payment = eval(pack)
-		bidder_peer = self.peername[bidder_ip]
+		if bidder_ip in self.peername:
+			bidder_peer = self.peername[bidder_ip]
+		else:
+			bidder_peer = 'peer'
+			self.bidders[bidder_ip] = {}
 		# write to file
 		self.loglist(['#D', peer, bidder_peer])
 		self.logline(str(timestamp))
@@ -117,7 +121,7 @@ class LogServer(object):
 		# write to file
 		self.loglist(['#T', from_peer, to_peer])
 		self.logline(str(timestamp))
-		self.loglist([index, float(size)/1024/1024, duration])
+		self.loglist([index, float(size)/1024/1024 * 8, duration])
 		
 
 class LogClient(object):

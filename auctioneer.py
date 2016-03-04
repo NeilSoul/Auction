@@ -105,7 +105,7 @@ class Auctioneer(object):
 					self.tasks[ip] = self.tasks[ip] - 1
 					#logging 
 					self.logger.transport_complete(ip, index, size, duration)
-					print '[task completed]', index, url
+					print '[task completed]', index, float(size)/1024/128, url
 			except:
 				#Time out
 				self.auction()
@@ -149,8 +149,8 @@ class Auctioneer(object):
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Auctioneer')
-	parser.add_argument('--peer', required=False, default='Peer', help='name of peer')
-	parser.add_argument('--segment', type=int, default=setting.AUCTIONEER_SEG_NUM, help='segments per auction')
+	parser.add_argument('-p', '--peer', required=False, default='Peer', help='name of peer')
+	parser.add_argument('-s', '--segment', type=int, default=setting.AUCTIONEER_SEG_NUM, help='segments per auction')
 	return parser.parse_args()
 
 if __name__ == "__main__":

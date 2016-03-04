@@ -88,13 +88,12 @@ class Bidder(object):
 		self.transport_center.close()
 		self.clear_player()
 		self.running = 0
-		self.played_queue.put(-1)#important
 
 	""" Player Methods"""
 	def prepare2play(self, url):
-		print 'm3u8 parsing...'
+		print '[m3u8 parsing]...'
 		self.descriptor_list = parse_m3u8(url)
-		self.rate_list = self.descriptor_list[0][1].keys()
+		self.rate_list = sorted(self.descriptor_list[0][1].keys())
 		# streaming parameters
 		self.selected_rate = self.rate_list[0]
 		self.last_index = len(self.descriptor_list) - 1
@@ -112,12 +111,16 @@ class Bidder(object):
 		self.bufferd_index = 0
 		# status of player
 		self.player_status = 'prepared'
-		print 'm3u8 ready.'
-		self.played_queue = Queue()
+		print 'duration', self.average_duration
+		print 'rates', map(lambda r:float(r)/1024/1024, self.rate_list)
+		# streaming engine
+		self.played_queue = Queue() # [(index, bytes_of_data)]
 		self.stream_simulation = threading.Thread(target = self.streaming)
 		self.stream_simulation.start()
-		self.retrieving_timeout = threading.Thread(target=self.time_trunk, args=(10,))
+		# timeout protection
+		self.retrieving_timeout = threading.Thread(target=self.time_trunk, args=(setting.AUCTIONEER_DOWNLOAD_TIMEOUT,))
 		self.retrieving_timeout.start()
+		# clear player
 		self.clear_player()
 		# core
 		self.core = BidderCore(self)
@@ -130,11 +133,12 @@ class Bidder(object):
 
 	def streaming(self):
 		while self.running:
-			index = self.played_queue.get()
-			if index < 0:
-				break
+			try:
+				index, bytes = self.played_queue.get(timeout=1)
+			except:
+				continue
 			duration = self.descriptor_list[index][0]
-			print '[play]', index, 'duration', duration
+			print '[play]', index, 'duration', duration, 'size', float(bytes)/1024/128
 			time.sleep(duration)
 			if index >= self.last_index:
 				break 
@@ -191,7 +195,8 @@ class Bidder(object):
 					self.player_status = "playing"
 					realplay = threading.Thread(target = self.realstreaming)
 					realplay.start()
-			self.played_queue.put(self.bufferd_index)
+			played_entry = (self.bufferd_index, len(self.retrieved[self.bufferd_index]))
+			self.played_queue.put(played_entry)
 			# next
 			del self.retrieved[self.bufferd_index]
 			self.bufferd_index = self.bufferd_index + 1
@@ -213,9 +218,9 @@ class Bidder(object):
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Bidder')
-	parser.add_argument('--peer', required=False, default='Peer', help='name of peer')
-	parser.add_argument('--url', required=False, default=setting.PLAYER_DEFAULT_URL, help='url to play')
-	parser.add_argument('--silent', action='store_true')
+	parser.add_argument('-p','--peer', required=False, default='Peer', help='name of peer')
+	parser.add_argument('-u','--url', required=False, default=setting.PLAYER_DEFAULT_URL, help='url to play')
+	parser.add_argument('-s','--silent', action='store_true', help='not play video actually')
 	return parser.parse_args()
 
 if __name__ == "__main__":

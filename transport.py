@@ -133,7 +133,7 @@ class TransportClient(object):
 		self.port = port
 		self.protocol = protocol
 
-	# block function, return size, duration
+	# block function, return size(bytes), duration
 	def transport(self, ip, index, from_url):
 		# connect to sock
 		data_length = 0
@@ -142,7 +142,6 @@ class TransportClient(object):
 			sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 			sock.connect((ip, self.port))
 			data = FILE_BOF + str(index) + FILE_SEP
-			data_length += len(data)
 			sock.sendall(data)
 			# http task
 			f = urllib2.urlopen(from_url)

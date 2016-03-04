@@ -26,3 +26,4 @@ PLAYER_COMMAND = "mplayer"
 # Auction Parameters
 AUCTIONEER_SEG_NUM = 1 # segment number per auction
 AUCTIONEER_DEFAULT_CAPACITY = 1 # default capacity
+AUCTIONEER_DOWNLOAD_TIMEOUT = 60 # timeout check of downloading task （1 minute）
