@@ -44,7 +44,9 @@ class LogServer(object):
 		except:
 			return
 		# divide instructions
-		if inst == 'A':
+		if inst == 'P':
+			self.mark_peer(ip, pack)
+		elif inst == 'A':
 			self.auction_broadcast(ip, pack)
 		elif inst == 'D':
 			self.auction_decide(ip, pack)
@@ -61,6 +63,9 @@ class LogServer(object):
 
 	def loglist(self, list):
 		self.logline(' '.join(map(lambda x:str(x), list)))
+
+	def mark_peer(self, pack):
+		self.peername[ip] = pack
 
 	def auction_broadcast(self, ip, pack):
 		# extract
@@ -133,6 +138,9 @@ class LogClient(object):
 
 	def send(self, message):
 		self.sender.sendto(message, self.sender_address)
+
+	def add_peer(self, peer):
+		self.send(':'.join['P', peer])
 
 	def auction_broadcast(self, peer, k, capacity, cti, cda, cwda):
 		pack = str([peer, k, capacity, cti, cda, cwda])

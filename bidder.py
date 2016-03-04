@@ -62,6 +62,7 @@ class Bidder(object):
 			TransportProtocol(self))
 		# log center
 		self.logger = log.LogClient(peername)
+		self.logger.add_peer(peername)
 		# init
 		self.peername = peername
 		self.silent = silent

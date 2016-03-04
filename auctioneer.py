@@ -65,6 +65,7 @@ class Auctioneer(object):
 			TransportProtocol(self))
 		# log center
 		self.logger = log.LogClient(peername)
+		self.logger.add_peer(peername)
 		# algorithm core
 		self.core = AuctioneerCore(self)
 
