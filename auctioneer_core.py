@@ -14,10 +14,10 @@ class AuctioneerCore(object):
 		self.capacity = capacity if capacity > 0 else self.default_capacity
 		#print 'estimate', self.capacity
 
-	def auction_message(self):
+	def auction_message(self, index):
 		inst = 'AUCTION'
 		# Inefficient str() eval()
-		return  ','.join([self.factory.peername, str(self.segment_number), str(self.capacity), 
+		return  ','.join([self.factory.peername, str(index), str(self.segment_number), str(self.capacity), 
 			str(self.cti), str(self.cda), str(self.cwda)])
 
 	# select bid @return {ip:(tasks, rate, payment)}

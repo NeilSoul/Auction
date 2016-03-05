@@ -7,28 +7,28 @@ auction event entry.
 ### auction broadcast
 format
 ```
-#A auctioneer_peer
+#A auctioneer_peer auction_index
 timestamp(second)
 segments capacity(mbps) cti cda cwda
 ```
 example
 ```
-#A A
-4.96642613411
-3 1 0.15 0.15 0.01
+#A A 0
+13.6212248802
+3 0.279 0.15 0.15 0.01
 ```
 
 ### auction decision
 format
 ```
-#D auctioneer_peer bidder_peer
+#D auctioneer_peer bidder_peer auction_index
 timestamp
 segments bitrate payment
 ```
 
 example
 ```
-#D A B
+#D A B 0
 5.88063812256
 3 0.296698570251 52.483137373
 ```
@@ -36,7 +36,7 @@ example
 ### bid
 format
 ```
-#B bidder_peer auction_peer
+#B bidder_peer auction_peer auction_index
 timestamp 
 segments buffer_size(seconds)
 rate1, rate2, ..., ratek(mbps)
@@ -45,7 +45,7 @@ price1, price2, ..., pricek
 
 example
 ```
-#B B A
+#B B A 0
 41.7679789066
 3 0.0
 0.507960319519 0.507960319519 0.507960319519

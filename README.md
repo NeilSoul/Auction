@@ -83,9 +83,14 @@ Ctrl+C or input [exit]
 
 Run of log :
 ```
-usage: log.py logfile
-positional arguments:
-  logfile     file name of the log.
+usage: log.py [-h] [-l LOGFILE]
+
+Logger
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l LOGFILE, --logfile LOGFILE
+                        file name of the log.
 ```
 Exit of log :
 ```

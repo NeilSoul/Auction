@@ -73,11 +73,12 @@ class Auctioneer(object):
 	""" Auctioneer Life Cycle"""
 	def start(self):
 		print self.peername, 'running...'
-		# init
+		# INIT
 		self.running = 1
 		self.transport_queue = Queue()
 		self.bids = {}# bids {ip:bid}
 		self.tasks = {}# tasks {ip:task number}
+		self.auction_index = 0
 		# launch
 		self.message_server.start()
 		self.message_client.start()
@@ -117,7 +118,7 @@ class Auctioneer(object):
 				#Time out
 				self.auction()
 				time.sleep(0.1)
-				self.bid_decide()
+				self.decide_auction()
 
 
 	""" Auction Factory.
@@ -127,19 +128,23 @@ class Auctioneer(object):
 	def auction(self):
 		# logging
 		self.logger.auction_broadcast(self.peername, 
+			self.auction_index,
 			self.auctioneer_params['segment'], 
 			self.core.capacity, 
 			self.auctioneer_params['timecost'], 
 			self.auctioneer_params['cellular'], 
 			self.auctioneer_params['wifi'])
+		# broadcast
 		self.bids.clear()
-		auction_info = ':'.join(['AUCTION',self.core.auction_message()])
-		self.message_client.broadcast(auction_info)
+		auction_info = self.core.auction_message(self.auction_index)
+		self.message_client.broadcast(':'.join(['AUCTION', auction_info]))
 
 	def receive_bid(self, ip, bid):
-		self.bids[ip] = bid
+		index, bid_details = bid.split(',',1)
+		if int(index) == self.auction_index:
+			self.bids[ip] = bid_details
 
-	def bid_decide(self):
+	def decide_auction(self):
 		if not self.bids:#receive no bids
 			return
 		self.tasks.clear()
@@ -151,7 +156,9 @@ class Auctioneer(object):
 			alloc_result =  ','.join([str(allocs[ip][0]), str(allocs[ip][1])])
 			self.message_client.sendto(ip, ':'.join(['WIN', alloc_result]))
 			# logging
-			self.logger.auction_decide(self.peername, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
+			self.logger.auction_decide(self.peername, self.auction_index, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
+		# finish one auction
+		self.auction_index += 1
 		# logging
 		self.logger.decide_complete(self.peername)
 

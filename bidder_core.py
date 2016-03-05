@@ -21,12 +21,13 @@ class BidderCore(object):
 			self.valuation[rate] = val
 			val = val + 1
 	""" event handler """
-	# auction @return auction_peer, bid
-	def handle_auction(self, auction):
+	# bid to auction @return bid : [a_peer, a_index, bid_details]
+	def bid2auction(self, auction):
 		if self.factory.buffer_size() > self.max_buffer_size:
 			#print '[buffered]', self.factory.buffer_size()
-			return None, None
-		auction_peer,segments,capacity,cti,cda,cwda = auction.split(',')
+			return None
+		auction_peer,auction_index,segments,capacity,cti,cda,cwda = auction.split(',')
+		auction_index = auction_index
 		segments = int(segments)
 		capacity = float(capacity)
 		cti = float(cti)
@@ -42,7 +43,7 @@ class BidderCore(object):
 			price = self.utility(rk, k+1, capacity)
 			prices.append(price)
 			gains.append(price - self.cost(rk,k+1,capacity, cti, cda, cwda))
-		return auction_peer, (bitrates, prices, gains)
+		return (auction_peer, auction_index, (bitrates, prices, gains))
 
 	def update_previous(self, rate):
 		self.previous_bitrate = rate/1024/1024

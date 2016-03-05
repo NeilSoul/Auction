@@ -174,10 +174,15 @@ class Bidder(object):
 	send task : send segment task for auction.
 	"""
 	def bid(self, ip, auction):
-		auction_peer, bid = self.core.handle_auction(auction)
-		if bid:
-			self.logger.bid_send(self.peername, auction_peer, self.buffer_size(), bid)
-			self.message_client.sendto(ip, ':'.join(['BID',str(bid)]))
+		bid_pack = self.core.bid2auction(auction)
+		if bid_pack:
+			# unpack
+			auction_peer, auction_index, bid = bid_pack
+			# logging
+			self.logger.bid_send(self.peername, auction_peer, auction_index, self.buffer_size(), bid)
+			# response
+			bid_info = ','.join([auction_index, str(bid)])
+			self.message_client.sendto(ip, ':'.join(['BID', bid_info]))
 
 	def send_task(self, ip, info):
 		segment_allocated, rate = map(lambda a:int(a), info.split(','))

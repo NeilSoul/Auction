@@ -7,7 +7,7 @@ import setting
 
 class LogServer(object):
 	def __init__(self, filename):
-		self.filename = filename
+		self.filename = filename if filename else ''.join([time.strftime("%m-%d"),'-',str(int(time.time()) % 100).zfill(3), '.log'])
 		self.server_address = (setting.LOG_HOST, setting.LOG_PORT)
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.server.setblocking(False)
@@ -72,12 +72,12 @@ class LogServer(object):
 	def auction_broadcast(self, ip, pack):
 		# extract
 		timestamp = time.time() - self.timestart
-		peer,segments,capacity,cti,cda,cwda = eval(pack)
+		peer,index,segments,capacity,cti,cda,cwda = eval(pack)
 		# mark
 		self.peername[ip] = peer
 		# write to file
 		if not ip in self.auctioneers or not self.auctioneers[ip]:
-			self.loglist(['#A', peer])
+			self.loglist(['#A', peer, index])
 			self.logline(str(timestamp))
 			self.loglist([segments, capacity, cti, cda, cwda])
 		self.auctioneers[ip] = 1
@@ -85,14 +85,14 @@ class LogServer(object):
 	def auction_decide(self,ip, pack):
 		# extract
 		timestamp = time.time()- self.timestart
-		peer, bidder_ip, segments, bitrate, payment = eval(pack)
+		peer, index, bidder_ip, segments, bitrate, payment = eval(pack)
 		if bidder_ip in self.peername:
 			bidder_peer = self.peername[bidder_ip]
 		else:
 			bidder_peer = 'peer'
 			self.bidders[bidder_ip] = {}
 		# write to file
-		self.loglist(['#D', peer, bidder_peer])
+		self.loglist(['#D', peer, bidder_peer, index])
 		self.logline(str(timestamp))
 		self.loglist([segments, float(bitrate)/1024/1024, payment])
 		# clear
@@ -104,7 +104,7 @@ class LogServer(object):
 	def bid_send(self, ip, pack):
 		# extract
 		timestamp = time.time()- self.timestart
-		peer, auction_peer, buffer_size, bid = eval(pack)
+		peer, auction_index, auction_peer, buffer_size, bid = eval(pack)
 		bitrates,prices,gains = bid
 		# mark
 		self.peername[ip] = peer
@@ -112,7 +112,7 @@ class LogServer(object):
 		if not ip in self.bidders:
 			self.bidders[ip] = {}
 		if not auction_peer in self.bidders[ip] or not self.bidders[ip][auction_peer]:
-			self.loglist(['#B', peer, auction_peer])
+			self.loglist(['#B', peer, auction_peer, auction_index])
 			self.logline(str(timestamp))
 			self.loglist([len(bitrates), buffer_size])
 			self.loglist(map(lambda rate:float(rate)/1024/1024,bitrates))
@@ -144,19 +144,19 @@ class LogClient(object):
 	def add_peer(self, peer):
 		self.send(':'.join(['P', peer]))
 
-	def auction_broadcast(self, peer, k, capacity, cti, cda, cwda):
-		pack = str([peer, k, capacity, cti, cda, cwda])
+	def auction_broadcast(self, peer, index, k, capacity, cti, cda, cwda):
+		pack = str([peer, index, k, capacity, cti, cda, cwda])
 		self.send(':'.join(['A', pack]))
 
-	def auction_decide(self, peer, bidder_ip, segments, bitrate, payment):
-		pack = str([peer, bidder_ip, segments, bitrate, payment])
+	def auction_decide(self, peer, index, bidder_ip, segments, bitrate, payment):
+		pack = str([peer, index, bidder_ip, segments, bitrate, payment])
 		self.send(':'.join(['D', pack]))
 
 	def decide_complete(self, peer):
 		self.send(':'.join(['C',peer]))
 
-	def bid_send(self, peer, auction_peer, buffer_size, bid):
-		pack = str([peer, auction_peer, buffer_size, bid])
+	def bid_send(self, peer, auction_peer, auction_index, buffer_size, bid):
+		pack = str([peer, auction_index, auction_peer, buffer_size, bid])
 		self.send(':'.join(['B', pack]))
 
 	def transport_complete(self, bidder_ip, index, size, duration):
@@ -164,7 +164,7 @@ class LogClient(object):
 		self.send(':'.join(['T', pack]))
 def parse_args():
 	parser = argparse.ArgumentParser(description='Logger')
-	parser.add_argument('-l','--logfile', default='auction.log', help='file name of the log.')
+	parser.add_argument('-l','--logfile', help='file name of the log.')
 	return parser.parse_args()
 
 if __name__=="__main__":
