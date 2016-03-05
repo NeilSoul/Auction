@@ -208,16 +208,20 @@ class Bidder(object):
 		# write into buffer
 		del self.retrieving[index]
 		self.retrieved[index] = data
+		# TODO buffered_index thread safe
 		while self.bufferd_index in self.retrieved:
-			with open(setting.PLAYER_BUFFER, 'ab') as f:
-				#buffered
-				f.write(self.retrieved[self.bufferd_index])
-				if self.player_status == 'prepared' and not self.silent:
-					self.player_status = "playing"
-					realplay = threading.Thread(target = self.realstreaming)
-					realplay.start()
+			# push into simuation
 			played_entry = (self.bufferd_index, len(self.retrieved[self.bufferd_index]))
 			self.played_queue.put(played_entry)
+			# write into real file
+			if not self.silent:
+				with open(setting.PLAYER_BUFFER, 'ab') as f:
+					#buffered
+					f.write(self.retrieved[self.bufferd_index])
+					if self.player_status == 'prepared':
+						self.player_status = "playing"
+						realplay = threading.Thread(target = self.realstreaming)
+						realplay.start()
 			# next
 			del self.retrieved[self.bufferd_index]
 			self.bufferd_index = self.bufferd_index + 1

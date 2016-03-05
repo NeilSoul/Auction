@@ -145,6 +145,8 @@ class Auctioneer(object):
 			self.bids[ip] = bid_details
 
 	def decide_auction(self):
+		# finish one auction
+		self.auction_index += 1 # TODO thread safe ,dict size change when iteration
 		if not self.bids:#receive no bids
 			return
 		self.tasks.clear()
@@ -157,8 +159,6 @@ class Auctioneer(object):
 			self.message_client.sendto(ip, ':'.join(['WIN', alloc_result]))
 			# logging
 			self.logger.auction_decide(self.peername, self.auction_index, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
-		# finish one auction
-		self.auction_index += 1
 		# logging
 		self.logger.decide_complete(self.peername)
 
