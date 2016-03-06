@@ -103,17 +103,19 @@ class Auctioneer(object):
 				if self.tasks[ip] > 0:
 					index, url = task.split(',',1)
 					size, duration = self.transport.transport(ip, index, url)
+					size = float(size) / 1024 / 128 #bytes to mb
 					#delay
 					if self.delay > 1.0:
 						#print 'delay', duration  * (self.delay - 1.0)
 						time.sleep(duration * (self.delay - 1.0))
 						duration = duration * self.delay
-					capacity = float(size)/duration/1024/1024 if duration > 0 else self.auctioneer_params['capacity']
-					self.core.estimate_capacity(round(capacity,3))
+					capacity = size / duration if duration > 0 else self.auctioneer_params['capacity']
+					self.core.estimate_capacity(capacity)
 					self.tasks[ip] = self.tasks[ip] - 1
 					#logging 
 					self.logger.transport_complete(ip, index, size, duration)
-					print '[task completed]', index, round(float(size)/1024/128,3), round(capacity,3), url
+					print '[task completed]No.', index,
+					print ', size =', round(size,3), '(mb), capacity =', round(capacity,3), '(mbps), url = ', url
 			except:
 				#Time out
 				self.auction()

@@ -98,7 +98,7 @@ class Bidder(object):
 
 	""" Player Methods"""
 	def prepare2play(self, url):
-		print '[m3u8 parsing]...'
+		print '[m3u8 parsing]... url = ', url
 		self.descriptor_list = parse_m3u8(url)
 		self.rate_list = sorted(self.descriptor_list[0][1].keys())
 		# streaming parameters
@@ -118,8 +118,8 @@ class Bidder(object):
 		self.bufferd_index = 0
 		# status of player
 		self.player_status = 'prepared'
-		print 'duration', self.average_duration
-		print 'rates', map(lambda r:float(r)/1024/1024, self.rate_list)
+		print '[m3u8 parsed] duration = ', self.average_duration, 
+		print '(s), rates = ', map(lambda r:float(r)/1024/1024, self.rate_list), '(mbps)'
 		# streaming engine
 		self.played_queue = Queue() # [(index, bytes_of_data)]
 		self.played_cond = threading.Condition()
@@ -140,22 +140,23 @@ class Bidder(object):
 
 	def streaming(self):
 		rebuffer = 0
-		rebuffer_mark = time.time()
+		delay_mark = time.time()
 		while self.running:
 			try:
 				index, bytes = self.played_queue.get(timeout=1)
 			except:
 				continue
 			# record rebuffer
-			rebuffer += time.time() -rebuffer_mark
+			delay = time.time() - delay_mark
+			rebuffer += delay
 			duration = self.descriptor_list[index][0]
-			print '[play]', index, 'rebuffer', rebuffer, 'duration', duration
+			print '[playing ]No.', index, ', duration = ', duration, '(s), delay = ', round(delay,3), '(s), rebuffer = ', round(rebuffer,3) ,'(s)'
 			#time.sleep(duration)
 			self.played_cond.acquire()
 			self.played_cond.wait(duration)
 			self.played_cond.release()
 			# mark 
-			rebuffer_mark = time.time()
+			delay_mark = time.time()
 			if index >= self.last_index:
 				break 
 
@@ -199,7 +200,7 @@ class Bidder(object):
 
 	""" Transport Factory """
 	def receive_trunk(self, ip, index, data):
-		print '[received]', index, 'size', float(len(data))/1024/128
+		print '[received]No.', index, ', size =', round(float(len(data))/1024/128,3), 'mb'
 		# discard wild data
 		if not index in self.retrieving: 
 			return
@@ -253,6 +254,8 @@ def parse_args():
 	parser.add_argument('-t','--theta', default=setting.BIDDER_BASIC_TH, type=float, help='bidder preference theta')
 	parser.add_argument('-q','--quality', default=setting.BIDDER_K_QV, type=float, help='bidder quality coefficient')
 	parser.add_argument('-b','--buffer', default=setting.BIDDER_K_BUF, type=float, help='bidder buffer coefficient')
+	parser.add_argument('-e','--ktheta', default=setting.BIDDER_K_THETA, type=float, help='bidder k^theta coefficient')
+	parser.add_argument('-r','--kbr', default=setting.BIDDER_K_BR, type=float, help='bidder k^br coefficient')
 	parser.add_argument('-m','--mbuffer', default=setting.BIDDER_MAX_BUF, type=float, help='bidder max buffer')
 	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
@@ -260,6 +263,8 @@ def parse_args():
 	bidder_params['theta'] = args.theta
 	bidder_params['kqv'] = args.quality
 	bidder_params['kbuf'] = args.buffer 
+	bidder_params['ktheta'] = args.ktheta
+	bidder_params['kbr'] = args.kbr
 	bidder_params['mbuf'] = args.mbuffer
 	bidder_params['broadcast'] = args.broadcast
 	return args.peer, args.url, args.silent, bidder_params

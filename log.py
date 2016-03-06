@@ -90,6 +90,7 @@ class LogServer(object):
 			bidder_peer = self.peername[bidder_ip]
 		else:
 			bidder_peer = 'peer'
+		if not bidder_ip in self.bidders:
 			self.bidders[bidder_ip] = {}
 		# write to file
 		self.loglist(['#D', peer, bidder_peer, index])
@@ -128,7 +129,7 @@ class LogServer(object):
 		# write to file
 		self.loglist(['#T', from_peer, to_peer])
 		self.logline(str(timestamp))
-		self.loglist([index, float(size)/1024/1024 * 8, duration])
+		self.loglist([index, size, duration])
 		
 
 class LogClient(object):
