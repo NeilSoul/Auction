@@ -147,10 +147,10 @@ class Auctioneer(object):
 			self.bids[ip] = bid_details
 
 	def decide_auction(self):
-		# finish one auction
-		self.auction_index += 1 # TODO thread safe ,dict size change when iteration
 		if not self.bids:#receive no bids
 			return
+		# finish one auction
+		self.auction_index += 1 # TODO thread safe ,dict size change when iteration
 		self.tasks.clear()
 		# dict {ip : (segments, rate, payment)}
 		allocs = self.core.select_bid(self.bids)

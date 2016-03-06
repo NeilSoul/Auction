@@ -13,6 +13,7 @@ class BidderCore(object):
 		self.valuation_kbuf = setting.BIDDER_K_BUF if not 'kbuf' in bidder_params else bidder_params['kbuf']
 		self.k_theta = bidder_params['ktheta']
 		self.k_br = bidder_params['kbr']
+		self.k_capacity = bidder_params['kcapacity']
 		self.max_buffer_size = setting.BIDDER_MAX_BUF if not 'mbuf' in bidder_params else bidder_params['mbuf']
 		self.current_buffer_size = 0
 		self.previous_bitrate = 0
@@ -26,7 +27,7 @@ class BidderCore(object):
 		auction_peer,auction_index,segments,capacity,cti,cda,cwda = auction.split(',')
 		auction_index = auction_index
 		segments = int(segments)
-		capacity = float(capacity)
+		capacity = float(capacity) * self.k_capacity
 		cti = float(cti)
 		cda = float(cda)
 		cwda = float(cwda)

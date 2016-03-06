@@ -30,9 +30,9 @@ AUCTIONEER_COST_DA = 0.15 # cost on cellular link
 AUCTIONEER_COST_WDA = 0.1 # cost on WiFi link
 AUCTIONEER_DOWNLOAD_TIMEOUT = 60 # timeout check of downloading task （1 minute）
 # M(Bidder) paramters
-BIDDER_BASIC_TH = 0.5 # basic preference
+BIDDER_BASIC_TH = 1 # basic preference
 BIDDER_MAX_BUF = 40 # maximum buffer size
 BIDDER_K_QV = 0.2
-BIDDER_K_BUF = 0.002
-BIDDER_K_THETA = 0.2
+BIDDER_K_BUF = 0.01
+BIDDER_K_THETA = 15
 BIDDER_K_BR = 1.5

@@ -257,6 +257,7 @@ def parse_args():
 	parser.add_argument('-e','--ktheta', default=setting.BIDDER_K_THETA, type=float, help='bidder k^theta coefficient')
 	parser.add_argument('-r','--kbr', default=setting.BIDDER_K_BR, type=float, help='bidder k^br coefficient')
 	parser.add_argument('-m','--mbuffer', default=setting.BIDDER_MAX_BUF, type=float, help='bidder max buffer')
+	parser.add_argument('-k','--kcapacity', default=1.0, type=float, help='bidder capacity coefficient')
 	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
 	bidder_params = {}
@@ -266,6 +267,7 @@ def parse_args():
 	bidder_params['ktheta'] = args.ktheta
 	bidder_params['kbr'] = args.kbr
 	bidder_params['mbuf'] = args.mbuffer
+	bidder_params['kcapacity'] = args.kcapacity
 	bidder_params['broadcast'] = args.broadcast
 	return args.peer, args.url, args.silent, bidder_params
 
