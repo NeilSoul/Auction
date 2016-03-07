@@ -4,7 +4,6 @@ import os
 import threading
 import subprocess
 import time
-from Queue import Queue
 from Queue import PriorityQueue
 import argparse
 import setting
@@ -13,6 +12,7 @@ import transport
 import log
 from parser import parse_m3u8
 from bidder_core import BidderCore
+from bidder_player import BidderPlayer
 
 class BidderProtocol(message.Protocol):
 	def __init__(self, factory):
@@ -38,7 +38,8 @@ class TransportProtocol(transport.Protocol):
 	def receive_successed(self, index, list, address):
 		ip = address[0]
 		data = b''.join(list)
-		threading.Thread(target=self.factory.receive_trunk, args=(ip, int(index), data)).start()
+		self.factory.receive_trunk(ip, int(index), data)
+
 	def receive_failed(self, index, list, address):
 		ip = address[0]
 		self.factory.fail_trunk(ip, int(index))
@@ -46,6 +47,13 @@ class TransportProtocol(transport.Protocol):
 
 class Bidder(object):
 	def __init__(self, peername, url, silent, bidder_params):
+		# INIT properties
+		self.peername = peername
+		self.silent = silent
+		self.streaming_url = url
+		self.bidder_params = bidder_params
+		self.fname_of_buffer = setting.PLAYER_BUFFER
+		self.command_of_player = setting.PLAYER_COMMAND
 		# bidder message server
 		self.message_server  = message.MessageServer(
 			setting.UDP_HOST, 
@@ -61,22 +69,22 @@ class Bidder(object):
 			setting.TRP_HOST,
 			setting.TRP_PORT,
 			TransportProtocol(self))
+		# player
+		self.player = BidderPlayer(self)
 		# log center
 		self.logger = log.LogClient(peername, bidder_params['broadcast'])
 		self.logger.add_peer(peername)
-		# other properties
-		self.peername = peername
-		self.silent = silent
-		self.streaming_url = url
-		self.bidder_params = bidder_params
+		
 
 	""" Bidder(receiver, player) Life Cycle """
 	def start(self):
 		self.running = 1
-		self.prepare2play(self.streaming_url)
+		self.prepare()
+		self.player.play()
 		self.message_server.start()
 		self.message_client.start()
 		self.transport_center.start()
+		
 
 	def join(self):
 		self.message_server.join()
@@ -87,88 +95,36 @@ class Bidder(object):
 		self.message_server.close()
 		self.message_client.close()
 		self.transport_center.close()
+		self.player.close()
 		self.running = 0
-		self.retrieving_timeout_cond.acquire()
-		self.retrieving_timeout_cond.notify()
-		self.retrieving_timeout_cond.release()
-		self.played_cond.acquire()
-		self.played_cond.notify()
-		self.played_cond.release()
-		self.clear_player()
+		self.task_timeout_cond.acquire()
+		self.task_timeout_cond.notify()
+		self.task_timeout_cond.release()
 
-	""" Player Methods"""
-	def prepare2play(self, url):
-		print '[m3u8 parsing]... url = ', url
-		self.descriptor_list = parse_m3u8(url)
-		self.rate_list = sorted(self.descriptor_list[0][1].keys())
-		# streaming parameters
-		self.selected_rate = self.rate_list[0]
-		self.last_index = len(self.descriptor_list) - 1
-		self.average_duration = self.descriptor_list[0][0]
-		self.max_rate = self.rate_list[-1]
-		# wait for auction : priority queue
-		self.wait_for_auction = PriorityQueue()
-		for i in range(len(self.descriptor_list)):
-			self.wait_for_auction.put(i)
+	def prepare(self):
+		self.player.prepare2play()
+		# the index of which trunk is ready to write into buffer  
+		self.ready_index = 0
+		# wait for auction : priority queue [segment number]
+		self.auction_waiting_queue = PriorityQueue()
+		for i in range(self.player.get_segment_number()):
+			self.auction_waiting_queue.put(i)
 		# wait for retrieve : dictionary (index:time)
 		self.retrieving = {}
 		# retrieved : dictionary (index:data)
 		self.retrieved = {}
-		# the index of which trunk is ready to write into buffer  
-		self.bufferd_index = 0
-		# status of player
-		self.player_status = 'prepared'
-		print '[m3u8 parsed] duration = ', self.average_duration, 
-		print '(s), rates = ', map(lambda r:float(r)/1024/1024, self.rate_list), '(mbps)'
-		# streaming engine
-		self.played_queue = Queue() # [(index, bytes_of_data)]
-		self.played_cond = threading.Condition()
-		threading.Thread(target = self.streaming).start()
+		self.task_cond = threading.Condition()
+		threading.Thread(target=self.task_loop, args=(1.0, )).start()
 		# timeout protection
-		self.retrieving_timeout_cond = threading.Condition()
-		threading.Thread(target=self.time_trunk, args=(setting.AUCTIONEER_DOWNLOAD_TIMEOUT,)).start()
-		# clear player
-		self.clear_player()
+		self.task_timeout_cond = threading.Condition()
+		threading.Thread(target=self.task_timeout, args=(setting.AUCTIONEER_DOWNLOAD_TIMEOUT,)).start()
 		# core
 		self.core = BidderCore(self, self.bidder_params)
 
-	def clear_player(self):
-		try:
-			os.remove(setting.PLAYER_BUFFER)
-		except:
-			pass
-
-	def streaming(self):
-		rebuffer = 0
-		delay_mark = time.time()
-		while self.running:
-			try:
-				index, bytes = self.played_queue.get(timeout=1)
-			except:
-				continue
-			# record rebuffer
-			delay = time.time() - delay_mark
-			rebuffer += delay
-			duration = self.descriptor_list[index][0]
-			print '[playing ]No.', index, ', duration = ', duration, '(s), delay = ', round(delay,3), '(s), rebuffer = ', round(rebuffer,3) ,'(s)'
-			#time.sleep(duration)
-			self.played_cond.acquire()
-			self.played_cond.wait(duration)
-			self.played_cond.release()
-			# mark 
-			delay_mark = time.time()
-			if index >= self.last_index:
-				break 
-
-	def realstreaming(self):
-		p = subprocess.Popen(setting.PLAYER_COMMAND.split() + [setting.PLAYER_BUFFER],stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		p.wait()
-		self.player_status = 'stopped'
-		self.close()
-		os._exit(0)
-
 	def buffer_size(self):
-		return self.average_duration * (len(self.retrieved) + self.played_queue.qsize() + len(self.retrieving))
+		buffer_in_player = self.player.get_buffer()
+		buffer_in_auction = self.player.get_segment_duration() * (len(self.retrieved) + len(self.retrieving))
+		return buffer_in_player + buffer_in_auction
 
 	""" Bid Factory.
 	bid : bid for auction.
@@ -188,63 +144,59 @@ class Bidder(object):
 	def send_task(self, ip, info):
 		segment_allocated, rate = map(lambda a:int(a), info.split(','))
 		self.core.update_previous(rate)
-		while segment_allocated > 0 and not self.wait_for_auction.empty():
-			index = self.wait_for_auction.get()
-			descriptor = self.descriptor_list[index]
-			trunk_duration = descriptor[0]
-			trunk_url = descriptor[1][rate]
+		while segment_allocated > 0 and not self.auction_waiting_queue.empty():
+			index = self.auction_waiting_queue.get()
+			task_url = self.player.get_segment_url(index, rate)
 			# send it to bidder
 			self.retrieving[index] = time.time()
-			self.message_client.sendto(ip, 'TASK:'+str(index)+','+trunk_url)
+			self.message_client.sendto(ip, 'TASK:'+str(index)+','+task_url)
 			segment_allocated = segment_allocated - 1
 
 	""" Transport Factory """
 	def receive_trunk(self, ip, index, data):
-		print '[received]No.', index, ', size =', round(float(len(data))/1024/128,3), 'mb'
+		print '[received]No.', index, ', size =', round(float(len(data))/1024/128,3), '(mb), buffer =', self.buffer_size(),'(s)'
 		# discard wild data
 		if not index in self.retrieving: 
 			return
-		# logging
-		# self.logger.send('trunk received.')
-		# write into buffer
 		del self.retrieving[index]
+		# retrieve thread safe
+		self.task_cond.acquire()
 		self.retrieved[index] = data
-		# TODO buffered_index thread safe
-		while self.bufferd_index in self.retrieved:
-			# push into simuation
-			played_entry = (self.bufferd_index, len(self.retrieved[self.bufferd_index]))
-			self.played_queue.put(played_entry)
-			# write into real file
-			if not self.silent:
-				with open(setting.PLAYER_BUFFER, 'ab') as f:
-					#buffered
-					f.write(self.retrieved[self.bufferd_index])
-					if self.player_status == 'prepared':
-						self.player_status = "playing"
-						realplay = threading.Thread(target = self.realstreaming)
-						realplay.start()
-			# next
-			del self.retrieved[self.bufferd_index]
-			self.bufferd_index = self.bufferd_index + 1
+		self.task_cond.notify()
+		self.task_cond.release()
+		
 
 	def fail_trunk(self, ip, index):
 		if not index in self.retrieving: #wild data
 			return
 		del self.retrieving[index]
-		self.wait_for_auction.put(index)
+		self.auction_waiting_queue.put(index)
 
-	def time_trunk(self, timeout):
-		self.retrieving_timeout_cond
+	""" Task """
+	def task_timeout(self, timeout):
 		while self.running:
 			now = time.time()
 			for index in self.retrieving:#TODO thread safe
 				if self.retrieving[index] - now > timeout:
 					del self.retrieving[index]
-					self.wait_for_auction.put(index)
+					self.auction_waiting_queue.put(index)
 			#time.sleep(timeout)
-			self.retrieving_timeout_cond.acquire()
-			self.retrieving_timeout_cond.wait(timeout)
-			self.retrieving_timeout_cond.release()
+			self.task_timeout_cond.acquire()
+			self.task_timeout_cond.wait(timeout)
+			self.task_timeout_cond.release()
+
+	def task_loop(self, timeout):
+		while self.running:
+			self.task_cond.acquire()
+			while self.running and not self.ready_index in self.retrieved:
+				self.task_cond.wait(timeout)
+			if not self.running:
+				break
+			if self.ready_index in self.retrieved:
+				self.player.segment_received(self.ready_index, self.retrieved[self.ready_index])
+				del self.retrieved[self.ready_index]
+				self.ready_index = self.ready_index + 1
+			self.task_cond.release()
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Bidder')

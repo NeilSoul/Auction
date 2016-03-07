@@ -3,7 +3,7 @@
 
 # UDP Message Protocols
 UDP_HOST = ''
-UDP_BROADCAST = '192.168.1.255'#'<broadcast>'#
+UDP_BROADCAST = '<broadcast>'#'192.168.1.255'#
 UDP_AUCTION_PORT = 9000
 UDP_BID_PORT = 9001
 
@@ -34,5 +34,5 @@ BIDDER_BASIC_TH = 1 # basic preference
 BIDDER_MAX_BUF = 40 # maximum buffer size
 BIDDER_K_QV = 0.2
 BIDDER_K_BUF = 0.01
-BIDDER_K_THETA = 15
+BIDDER_K_THETA = 20
 BIDDER_K_BR = 1.5

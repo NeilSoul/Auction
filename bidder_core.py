@@ -22,7 +22,6 @@ class BidderCore(object):
 	# bid to auction @return bid : [a_peer, a_index, bid_details]
 	def bid2auction(self, auction):
 		if self.factory.buffer_size() > self.max_buffer_size:
-			#print '[buffered]', self.factory.buffer_size()
 			return None
 		auction_peer,auction_index,segments,capacity,cti,cda,cwda = auction.split(',')
 		auction_index = auction_index
@@ -36,7 +35,7 @@ class BidderCore(object):
 		prices = []
 		gains = []
 		for k in range(segments):
-			rk = max(self.factory.rate_list, key =lambda r : self.utility(r, k+1, capacity, cti) - self.cost(r,k+1,capacity, cti, cda, cwda))
+			rk = max(self.factory.player.get_rate_list(), key =lambda r : self.utility(r, k+1, capacity, cti) - self.cost(r,k+1,capacity, cti, cda, cwda))
 			bitrates.append(rk)
 			price = self.utility(rk, k+1, capacity, cti)
 			prices.append(price)
@@ -50,11 +49,11 @@ class BidderCore(object):
 	# utility (assert capacity > 0)
 	def utility(self, rate, k, capacity, cti):
 		mrate = float(rate) / 1024 / 1024 
-		kb =  k*self.factory.average_duration
+		kb =  k*self.factory.player.get_segment_duration()
 		#depracated 1.0 : a = kb * math.log(1+self.preference()*self.valuation[rate])
 		a = kb * math.log(1+math.sqrt(self.preference())*self.valuation(rate, cti))
 		b = self.valuation_kqv*(self.previous_bitrate - mrate) if self.previous_bitrate - rate > 0 else 0
-		T = k*self.factory.max_rate /1024/1024/capacity
+		T = k*self.factory.player.get_max_rate() /1024/1024/capacity
 		buffer_current = self.factory.buffer_size() 
 		c1 = buffer_current - T if buffer_current-T > 0 else 0
 		c = self.valuation_kbuf*(2*kb*(self.max_buffer_size - c1) - kb*kb)
@@ -63,22 +62,14 @@ class BidderCore(object):
 	# cost (assert capacity > 0)
 	def cost(self, rate, k, capacity, cti, cda, cwda):
 		mrate = float(rate) / 1024 / 1024
-		kbr = k * self.factory.average_duration * mrate
+		kbr = k * self.factory.player.get_segment_duration() * mrate
 		return cti *  kbr / capacity + cda * kbr + cwda * kbr
 
 	# preference
 	def preference(self):
-		# deprecated 1.0 : return self.basic_preference + self.factory.buffer_size() / self.max_buffer_size
 		return self.basic_preference + self.k_theta * self.factory.buffer_size() / self.max_buffer_size
 
-	# valuation f(r)
-	''' valuation depracated 1.0
-		self.valuation = {}
-		val = 1
-		for rate in self.factory.rate_list:
-			self.valuation[rate] = val
-			val = val + 1
-	'''
+	# f(r)
 	def valuation(self, rate, cti):
 		r = float(rate) / 1024 / 1024
 		return self.k_br / math.sqrt(self.basic_preference + 0.5*self.k_theta) * math.exp(r *cti + r*r - 1)

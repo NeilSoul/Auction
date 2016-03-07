@@ -12,7 +12,8 @@ while True:
         print(time.ctime())
         # Read voltage,five multiple
         bus.write_byte(address, A0)
-        value = 5.0*5.0*bus.read_byte(address)/255
+        # B : value = 5.0*bus.read_byte(address)/255
+        value = 5.0*5.0*bus.read_byte(address)/255 #A
         print("voltage: %1.3f V" %value)
 
         # Read current,using MAX471 (1V/A)

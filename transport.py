@@ -135,16 +135,19 @@ class TransportClient(object):
 
 	# block function, return size(bytes), duration
 	def transport(self, ip, index, from_url):
+		stimeout = 1.0
+		utimeout = 3.0
 		# connect to sock
 		data_length = 0
 		tbegin = time.time()
 		try:
 			sock =socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+			sock.settimeout(stimeout)
 			sock.connect((ip, self.port))
 			data = FILE_BOF + str(index) + FILE_SEP
 			sock.sendall(data)
 			# http task
-			f = urllib2.urlopen(from_url)
+			f = urllib2.urlopen(from_url, timeout=utimeout)
 			while 1:
 				data = f.read(1024)
 				if not data:

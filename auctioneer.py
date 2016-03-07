@@ -40,8 +40,9 @@ class TransportProtocol(transport.Protocol):
 	''' downloader sending callback '''
 	def send_successed(self, index):
 		pass
+
 	def send_failed(self, index):
-		pass
+		print '[task failed]No.', index
 
 class Auctioneer(object):
 
@@ -100,27 +101,31 @@ class Auctioneer(object):
 		while self.running:
 			try:
 				ip,task = self.transport_queue.get(timeout=0.3)
-				if self.tasks[ip] > 0:
-					index, url = task.split(',',1)
-					size, duration = self.transport.transport(ip, index, url)
-					size = float(size) / 1024 / 128 #bytes to mb
-					#delay
-					if self.delay > 1.0:
-						#print 'delay', duration  * (self.delay - 1.0)
-						time.sleep(duration * (self.delay - 1.0))
-						duration = duration * self.delay
-					capacity = size / duration if duration > 0 else self.auctioneer_params['capacity']
-					self.core.estimate_capacity(capacity)
-					self.tasks[ip] = self.tasks[ip] - 1
-					#logging 
-					self.logger.transport_complete(ip, index, size, duration)
-					print '[task completed]No.', index,
-					print ', size =', round(size,3), '(mb), capacity =', round(capacity,3), '(mbps), url = ', url
 			except:
 				#Time out
 				self.auction()
 				time.sleep(0.1)
 				self.decide_auction()
+			else:
+				if not ip in self.tasks or self.tasks[ip] <= 0:
+					continue
+				index, url = task.split(',',1)
+				size, duration = self.transport.transport(ip, index, url)
+				size = float(size) / 1024 / 128 #bytes to mb
+				#delay
+				if self.delay > 1.0:
+					#print 'delay', duration  * (self.delay - 1.0)
+					time.sleep(duration * (self.delay - 1.0))
+					duration = duration * self.delay
+				capacity = size / duration if duration > 0 else self.auctioneer_params['capacity']
+				self.core.estimate_capacity(capacity)
+				self.tasks[ip] = self.tasks[ip] - 1
+				#logging 
+				self.logger.transport_complete(ip, index, size, duration)
+				print '[task completed]No.', index,
+				print ', size =', round(size,3), '(mb), capacity =', round(capacity,3), '(mbps), url = ', url,
+				print ', at',time.strftime("%H:%M:%S")
+			
 
 
 	""" Auction Factory.
