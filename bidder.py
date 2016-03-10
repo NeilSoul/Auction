@@ -147,6 +147,7 @@ class Bidder(object):
 		while segment_allocated > 0 and not self.auction_waiting_queue.empty():
 			index = self.auction_waiting_queue.get()
 			task_url = self.player.get_segment_url(index, rate)
+			print '[sended  ]No.',index,' rate = ', float(rate)/1024/1024 
 			# send it to bidder
 			self.retrieving[index] = time.time()
 			self.message_client.sendto(ip, 'TASK:'+str(index)+','+task_url)

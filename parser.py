@@ -1,16 +1,12 @@
 import m3u8
 
 
-def parse_m3u8_novar(url, string=None):
+def parse_m3u8_novar(url, obj=None):
     """Parse m3u8 without variable bitrates and return durations and URLs.
 
     The return value is a (float, str) tuple of duration and URL.
     """
-    if not string:
-        m3u8_obj = m3u8.load(url)
-    else:
-        m3u8_obj = m3u8.loads(string)
-        m3u8_obj.base_uri = url.rsplit('/', maxsplit=1)[0] + '/'
+    m3u8_obj = obj if obj else m3u8.load(url)
     return [(seg.duration, m3u8_obj.base_uri + seg.uri)
             for seg in m3u8_obj.segments]
 
@@ -45,7 +41,7 @@ def parse_m3u8(url):
     # no choice
     if not m3u8_obj.is_variant:
         return [(item[0], {0: item[1]}) for item in
-                parse_m3u8_novar(url, m3u8_obj.dumps())]
+                parse_m3u8_novar(url, m3u8_obj)]
 
     # with choice
     infolist = []
@@ -56,10 +52,10 @@ def parse_m3u8(url):
             if not infolist:
                 infolist = [(item[0], {bw: item[1]}) for item in newlist]
             else:
-                if len(newlist) != len(infolist):
+                if len(newlist) != len(infolist):#length error
                     raise ValueError
                 for i in range(len(infolist)):
-                    if newlist[i][0] != infolist[i][0]:
+                    if abs(newlist[i][0]-infolist[i][0]) > 0.1:#duration error
                         raise ValueError
                     infolist[i][1][bw] = newlist[i][1]
         return infolist
@@ -69,5 +65,10 @@ def parse_m3u8(url):
 
 # unit test
 if __name__ == "__main__":
-    url_var = "http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
+    #url_var = "http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
+    #url_var = "http://166.111.138.117/blackEmpire/high/prog_index.m3u8"
+    #url_var = "http://166.111.138.117/blackEmpire/blackEmpire.m3u8"
+    url_var = "http://115.28.222.35/fruit.m3u8"
+    #url_var = "http://devimages.apple.com/iphone/samples/bipbop/gear4/prog_index.m3u8"
     print(parse_m3u8(url=url_var))
+    #parse_m3u8(url=url_var)
