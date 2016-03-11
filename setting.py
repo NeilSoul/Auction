@@ -18,7 +18,7 @@ LOG_DIR = 'log'
 
 # Script
 SCRIPT_HOST = ''
-SCRIPT_PORT = 9010
+SCRIPT_PORT = 8000
 
 
 # Player Buffer

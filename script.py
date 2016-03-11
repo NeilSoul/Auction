@@ -18,6 +18,8 @@ class Peer(object):
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 		self.server.bind(self.server_address)
 		self.timeout = 3
+		self.bidder = None
+		self.auctioneer = None
 
 	def run(self):
 		while 1:
@@ -35,6 +37,7 @@ class Peer(object):
 
 
 	def receive(self, data, address):
+		print data,address
 		try:
 			peer, inst, pack = data.split(':',2)
 		except:
@@ -51,6 +54,8 @@ class Peer(object):
 
 
 	def auctioneer_start(self, pack):
+		if self.auctioneer && self.auctioneer.running:
+			return
 		delay, k = pack.split(',',1)
 		auctioneer_params = {}
 		auctioneer_params['segment'] = int(k)
@@ -64,10 +69,14 @@ class Peer(object):
 		self.auctioneer.start()
 
 	def auctioneer_stop(self, pack):
+		if not self.auctioneer or not self.auctioneer.running:
+			return
 		self.auctioneer.close()
 		self.auctioneer.join()
 
 	def bidder_start(self,pack):
+		if self.bidder && self.bidder.running:
+			return
 		bidder_params = {}
 		bidder_params['theta'] = setting.BIDDER_BASIC_TH
 		bidder_params['kqv'] = setting.BIDDER_K_QV
@@ -81,6 +90,8 @@ class Peer(object):
 		self.bidder.start()
 
 	def bidder_stop(self, pack):
+		if not self.bidder or not self.bidder.running:
+			return
 		self.bidder.close()
 		self.bidder.join()
 
@@ -92,8 +103,10 @@ class CenterBase(object):
 		self.sender_address = (setting.UDP_BROADCAST, setting.SCRIPT_PORT)
 		self.logfname = logfname
 	def send(self, peer, pack):
-		message = ''.join([peer, ':', pack])
-		self.sender.sendto(message, self.sender_address)
+		repeat = 6
+		for i in range(repeat):
+			message = ''.join([peer, ':', pack])
+			self.sender.sendto(message, self.sender_address)
 
 	''' To override '''
 	def run(self):
