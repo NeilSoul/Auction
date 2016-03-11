@@ -104,8 +104,12 @@ class Auctioneer(object):
 				ip,task = self.transport_queue.get(timeout=0.3)
 			except:
 				#Time out
-				self.auction()
-				time.sleep(0.1)
+				''' deprecatedself.auction()
+				time.sleep(0.1)'''
+				# repeated broadcast
+				for i in range(3):
+					self.auction()
+					time.sleep(0.033)
 				self.decide_auction()
 			else:
 				if not ip in self.tasks or self.tasks[ip] <= 0:
