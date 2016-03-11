@@ -115,10 +115,13 @@ class CenterBase(object):
 			setting.SCRIPT_PORT,
 			MessageProtocol(self))
 		self.logfname = logfname
+
 	def send(self, peer, pack):
+		# at one second 
 		repeat = 10
 		for i in range(repeat):
 			self.message_client.broadcast(''.join([peer, ':', pack]))
+			time.sleep(0.1)
 
 	''' To override '''
 	def run(self):
@@ -151,7 +154,7 @@ class CenterA(CenterBase):
 		print 'Scene A'
 		print 'log into', self.logfname
 		print 'waiting 400 seconds...'
-		t = 20.0
+		t = 400
 		# messager
 		self.message_client.start()
 		# log
@@ -162,15 +165,15 @@ class CenterA(CenterBase):
 		for peer in peers:
 			self.send(peer, 'B_START:1.0')
 		for peer in peers:
-			self.send(peer, 'A_START:10.0,3')
+			self.send(peer, 'A_START:3.0,3')
 		time.sleep(t*0.25) # 100s
 		self.send('B', 'A_STOP:')
 		time.sleep(t*0.125) # 50s : 150s
 		self.send('C', 'A_STOP:')
 		time.sleep(t*0.125) # 50s : 200s
-		self.send('B', 'A_START:10.0,3')
+		self.send('B', 'A_START:3.0,3')
 		time.sleep(t*0.125) # 50s : 250s
-		self.send('C', 'A_START:10.0,3')
+		self.send('C', 'A_START:3.0,3')
 		time.sleep(t*0.375) # 150 : 400s
 		for peer in peers:
 			self.send(peer, 'A_STOP:')
