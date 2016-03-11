@@ -37,7 +37,7 @@ class Peer(object):
 
 
 	def receive(self, data, address):
-		print data,address
+		#print data,address
 		try:
 			peer, inst, pack = data.split(':',2)
 		except:
