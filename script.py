@@ -183,6 +183,96 @@ class CenterA(CenterBase):
 		logger.close()
 		self.message_client.close()
 
+''' Scene B'''
+class CenterB(CenterBase):
+	
+	''' @override '''
+	def run(self):
+		print 'Scene B'
+		print 'log into', self.logfname
+		print 'waiting 400 seconds...'
+		t = 400
+		# messager
+		self.message_client.start()
+		# log
+		logger = LogServer(self.logfname)
+		logger.start()
+		# peers
+		peers = ['A', 'B', 'C', 'D']
+		for peer in peers:
+			self.send(peer, 'B_START:1.0')
+		self.send('A', 'A_START:2.0,3')
+		self.send('B', 'A_START:6.0,3')
+		self.send('C', 'A_START:6.0,3')
+		self.send('D', 'A_START:6.0,3')
+		time.sleep(t)
+		for peer in peers:
+			self.send(peer, 'A_STOP:')
+		for peer in peers:
+			self.send(peer, 'B_STOP:')
+		time.sleep(1.0)
+		logger.close()
+		self.message_client.close()
+		time.sleep(5.0)
+
+class CenterBNo(CenterBase):
+	
+	''' @override '''
+	def run(self, peer):
+		print 'Scene B'
+		print 'log into', self.logfname
+		print 'waiting 400 seconds...'
+		t = 200
+		# messager
+		self.message_client.start()
+		# log
+		logger = LogServer(self.logfname)
+		logger.start()
+		# peers
+		self.send(peer,'B_START:1.0')
+		if peer == 'A':
+			self.send('A', 'A_START:2.0,3')
+		else:
+			self.send(peer, 'A_START:6.0,3')
+		time.sleep(t)
+		self.send(peer, 'A_STOP:')
+		self.send(peer, 'B_STOP:')
+		time.sleep(1.0)
+		logger.close()
+		self.message_client.close()
+		time.sleep(5.0)
+
+
+''' Scene E'''
+class CenterE(CenterBase):
+	
+	''' @override '''
+	def run(self, k):
+		print 'Scene E'
+		print 'log into', self.logfname
+		print 'waiting 400 seconds...'
+		t = 200
+		# messager
+		self.message_client.start()
+		# log
+		logger = LogServer(self.logfname)
+		logger.start()
+		# peers
+		peers = ['A', 'B', 'C', 'D']
+		for peer in peers:
+			self.send(peer, 'B_START:1.0')
+		for peer in ['A','B']:
+			self.send(peer, 'A_START:3.0,'+str(k))
+		time.sleep(t)
+		for peer in ['A','B']:
+			self.send(peer, 'A_STOP:')
+		for peer in peers:
+			self.send(peer, 'B_STOP:')
+		time.sleep(1.0)
+		logger.close()
+		self.message_client.close()
+		time.sleep(5.0)
+
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Script')
@@ -198,7 +288,13 @@ if __name__=="__main__":
 		if args.script == 'Base':
 			CenterBase(args.logfile).run()
 		elif args.script == 'A':
-			CenterA(args.logfile).run()
+			for i in range(1):
+				CenterA(args.logfile +'_'+ str(i+3)+'.log').run()
+		elif args.script == 'B':
+			CenterB(args.logfile).run()
+		elif args.script == 'E':
+			for k in [1,3,5,10]:
+				CenterE(args.logfile+'_k_'+str(k)+'.log').run(k)
 		else:
 			print 'This script does not exist.'
 	else:

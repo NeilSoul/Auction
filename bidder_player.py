@@ -40,6 +40,10 @@ class BidderPlayer(object):
 		self.running = 1
 		# streaming engine
 		self.played_queue = Queue() # [(index, bytes_of_data)]
+		if self.silent:# at first full buffer , SPECIAL
+			buffer_num = self.factory.bidder_params['mbuf'] / self.segment_duration
+			for i in range(int(buffer_num)):
+				self.played_queue.put((0, None))
 		self.played_cond = threading.Condition()
 		threading.Thread(target = self.streaming).start()
 
