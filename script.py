@@ -54,7 +54,7 @@ class Peer(object):
 
 
 	def auctioneer_start(self, pack):
-		if self.auctioneer && self.auctioneer.running:
+		if self.auctioneer and self.auctioneer.running:
 			return
 		delay, k = pack.split(',',1)
 		auctioneer_params = {}
@@ -75,7 +75,7 @@ class Peer(object):
 		self.auctioneer.join()
 
 	def bidder_start(self,pack):
-		if self.bidder && self.bidder.running:
+		if self.bidder and self.bidder.running:
 			return
 		bidder_params = {}
 		bidder_params['theta'] = setting.BIDDER_BASIC_TH
