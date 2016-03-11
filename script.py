@@ -45,6 +45,10 @@ class Peer(object):
 					break
 		except KeyboardInterrupt:
 			pass
+		if self.bidder:
+			self.bidder.close()
+		if self.auctioneer:
+			self.auctioneer.close()
 		self.message_server.close()
 
 
@@ -112,7 +116,7 @@ class CenterBase(object):
 			MessageProtocol(self))
 		self.logfname = logfname
 	def send(self, peer, pack):
-		repeat = 4
+		repeat = 10
 		for i in range(repeat):
 			self.message_client.broadcast(''.join([peer, ':', pack]))
 
