@@ -3,7 +3,7 @@
 
 # UDP Message Protocols
 UDP_HOST = ''
-UDP_BROADCAST = '<broadcast>'#'192.168.1.255'#
+UDP_BROADCAST = '192.168.1.255'#'<broadcast>'#
 UDP_AUCTION_PORT = 9000
 UDP_BID_PORT = 9001
 

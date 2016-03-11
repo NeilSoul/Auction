@@ -102,7 +102,7 @@ class CenterBase(object):
 		logger = LogServer(self.logfname)
 		logger.start()
 		# peers
-		peers = ['A', 'B', 'C']
+		peers = ['A', 'B', 'C', 'D']
 		for peer in peers:
 			self.send(peer, 'A_START:1.0,'+str(setting.AUCTIONEER_SEG_NUM))
 		for peer in peers:
