@@ -102,7 +102,21 @@ Exit of log :
 Ctrl+C
 ```
 
-Example :
+Run of Script:
+```
+usage: script.py [-h] [-c] [-l LOGFILE] [-p PEER]
+
+Script
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c, --center          if is a role of center(peer default)
+  -l LOGFILE, --logfile LOGFILE
+                        file name of the log.
+  -p PEER, --peer PEER  peer name
+```
+
+Example (Manual):
 
 ```
 python log.py
@@ -116,6 +130,18 @@ python auctioneer.py -p A -s 5
 ```
 python bidder.py -p B -s
 # thirdly open bidder name B, which  not actually play but just download.
+```
+
+Example (Script):
+
+at peer
+```
+python script.py -p A
+```
+
+at center
+```
+python script.py -c
 ```
 
 

@@ -3,6 +3,7 @@ import time
 import socket
 import select
 import argparse
+import threading
 import setting
 
 class LogServer(object):
@@ -22,7 +23,7 @@ class LogServer(object):
 		self.timestart = time.time()
 
 	def run(self):
-		while 1:
+		while self.running:
 			try:
 				readable , writable , exceptional = select.select([self.server], [], [], self.timeout)
 			except select.error,e:
@@ -37,6 +38,13 @@ class LogServer(object):
 
 		self.server.close()
 		self.auction.close()
+
+	def start(self):
+		self.running = 1
+		threading.Thread(target=self.run).start()
+
+	def close(self):
+		self.running = 0
 
 	def receive(self, data, address):
 		# parse instruction
@@ -171,5 +179,13 @@ def parse_args():
 if __name__=="__main__":
 	args = parse_args()
 	server = LogServer(args.logfile)
-	server.run()
+	server.start()
+	try:
+		while True:
+			command = raw_input().lower()
+			if not command or command == 'exit':
+				break
+	except KeyboardInterrupt:
+		pass
+	server.close()
 

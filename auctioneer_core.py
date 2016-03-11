@@ -9,10 +9,15 @@ class AuctioneerCore(object):
 		self.cda = auctioneer_params['cellular']
 		self.cwda = auctioneer_params['wifi']
 		self.factory = factory
+		# capacity evaluator
+		self.capacity_window = 3
+		self.capacity_list = [self.default_capacity]*self.capacity_window
+		self.capacity_index = 0
 
 	def estimate_capacity(self, capacity):
-		self.capacity = capacity if capacity > 0 else self.default_capacity
-		#print 'estimate', self.capacity
+		self.capacity_list[self.capacity_index] = capacity if capacity > 0 else self.default_capacity
+		self.capacity_index = (self.capacity_index + 1) % self.capacity_window
+		self.capacity = sum(self.capacity_list) / self.capacity_window
 
 	def auction_message(self, index):
 		inst = 'AUCTION'
@@ -37,6 +42,9 @@ class AuctioneerCore(object):
 			p[ip] = 0 # assert (0,k-1)
 		for i in range(k):
 			ip = max(bids.keys(), key=lambda ip: scores[ip][p[ip]])
+			# strictly marginal score > 0
+			if scores[ip][p[ip]] <= 0:
+				break
 			p[ip] = p[ip] + 1
 		result = {}
 		for ip in p:

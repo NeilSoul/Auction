@@ -15,14 +15,22 @@ class BidderCore(object):
 		self.k_br = bidder_params['kbr']
 		self.k_capacity = bidder_params['kcapacity']
 		self.max_buffer_size = setting.BIDDER_MAX_BUF if not 'mbuf' in bidder_params else bidder_params['mbuf']
-		self.current_buffer_size = 0
 		self.previous_bitrate = 0
+		# M's f(r)
+		self.valuations = {}
+		fr = 1.0
+		for r in self.factory.player.get_rate_list():
+			self.valuations[r] = fr
+			fr += 1.0
 
 	""" event handler """
 	# bid to auction @return bid : [a_peer, a_index, bid_details]
 	def bid2auction(self, auction):
-		if self.factory.buffer_size() > self.max_buffer_size:
+		# buffer gap
+		current_buffer_size = self.factory.buffer_size()
+		if current_buffer_size > self.max_buffer_size:
 			return None
+		# unpack parameters
 		auction_peer,auction_index,segments,capacity,cti,cda,cwda = auction.split(',')
 		auction_index = auction_index
 		segments = int(segments)
@@ -30,11 +38,18 @@ class BidderCore(object):
 		cti = float(cti)
 		cda = float(cda)
 		cwda = float(cwda)
-		#print capacity,cti,cda,cwda
+		# calculate bitrates vector and prices vector
 		bitrates = []
 		prices = []
 		gains = []
+		brake = 0
 		for k in range(segments):
+			if brake or current_buffer_size + (k+1)*self.factory.player.get_segment_duration() > self.max_buffer_size:
+				bitrates.append(0)
+				prices.append(0)
+				gains.append(0)
+				brake = 1
+				continue
 			rk = max(self.factory.player.get_rate_list(), key =lambda r : self.utility(r, k+1, capacity, cti) - self.cost(r,k+1,capacity, cti, cda, cwda))
 			bitrates.append(rk)
 			price = self.utility(rk, k+1, capacity, cti)
@@ -71,8 +86,12 @@ class BidderCore(object):
 
 	# f(r)
 	def valuation(self, rate, cti):
-		r = float(rate) / 1024 / 1024
+		''' deprecated r = float(rate) / 1024 / 1024
 		return self.k_br / math.sqrt(self.basic_preference + 0.5*self.k_theta) * math.exp(r *cti + r*r - 1)
+		'''
+		# deprecated return self.valuations[rate]
+		return 0.5 + float(rate) / 1024 / 1024
+
 # unit test
 if __name__=="__main__":
 	bidder = 'Bidder()' #Bidder()

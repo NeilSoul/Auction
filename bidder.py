@@ -78,6 +78,7 @@ class Bidder(object):
 
 	""" Bidder(receiver, player) Life Cycle """
 	def start(self):
+		print 'Bidder', self.peername, '[ kcapacity = ', self.bidder_params['kcapacity'],'] running...'
 		self.running = 1
 		self.prepare()
 		self.player.play()
@@ -100,6 +101,7 @@ class Bidder(object):
 		self.task_timeout_cond.acquire()
 		self.task_timeout_cond.notify()
 		self.task_timeout_cond.release()
+		print 'Bidder', self.peername, 'stopped'
 
 	def prepare(self):
 		self.player.prepare2play()

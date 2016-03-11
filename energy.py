@@ -56,7 +56,7 @@ def parse_args():
         return args.peer, args.duration
 
 if __name__ == "__main__":
-        peer, durtion = parse_args()
+        peer, duration = parse_args()
         energy  = Energy(peer, duration)
         energy.start()
         try:

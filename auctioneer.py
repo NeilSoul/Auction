@@ -73,7 +73,7 @@ class Auctioneer(object):
 
 	""" Auctioneer Life Cycle"""
 	def start(self):
-		print self.peername, 'running...'
+		print 'Auctioneer', self.peername, '[ delay = ', self.auctioneer_params['delay'],'] running...'
 		# INIT
 		self.running = 1
 		self.transport_queue = Queue()
@@ -94,6 +94,7 @@ class Auctioneer(object):
 		self.message_server.close()
 		self.message_client.close()
 		self.running = 0
+		print 'Auctioneer', self.peername, 'stopped.'
 
 
 	def auction_loop(self):
@@ -123,7 +124,7 @@ class Auctioneer(object):
 				#logging 
 				self.logger.transport_complete(ip, index, size, duration)
 				print '[task completed]No.', index,
-				print ', size =', round(size,3), '(mb), capacity =', round(capacity,3), '(mbps), url = ', url,
+				print ', size =', round(size,3), '(mb), capacity =', round(capacity,3),'~', round(self.core.capacity,3), '(mbps), url = ', url,
 				print ', at',time.strftime("%H:%M:%S")
 			
 
@@ -165,7 +166,7 @@ class Auctioneer(object):
 			alloc_result =  ','.join([str(allocs[ip][0]), str(allocs[ip][1])])
 			self.message_client.sendto(ip, ':'.join(['WIN', alloc_result]))
 			# logging
-			self.logger.auction_decide(self.peername, self.auction_index, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
+			self.logger.auction_decide(self.peername, self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
 		# logging
 		self.logger.decide_complete(self.peername)
 
