@@ -69,6 +69,7 @@ class MessageClient(object):
 		#create a sending socket
 		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
+		self.sender.setblocking(False)
 		self.broadhost = broadcast
 		self.port = port
 		#Outgoing message queue

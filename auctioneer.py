@@ -104,9 +104,11 @@ class Auctioneer(object):
 				ip,task = self.transport_queue.get(timeout=0.3)
 			except:
 				#Time out
-				''' deprecatedself.auction()
-				time.sleep(0.1)'''
-				# repeated broadcast
+				''' deprecated
+				self.auction()
+				time.sleep(0.1)
+				''' 
+				#repeated broadcast
 				for i in range(3):
 					self.auction()
 					time.sleep(0.033)

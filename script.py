@@ -7,37 +7,48 @@ import setting
 from auctioneer import Auctioneer
 from bidder import Bidder
 from log import LogServer
+from message import MessageServer
+from message import MessageClient
+from message import Protocol
+
+
+class MessageProtocol(Protocol):
+	def __init__(self, factory):
+		self.factory = factory
+
+	''' server callback '''
+	def data_received(self, data, ip):
+		self.factory.receive(data, ip)
+	''' client callback '''
+	def send_sucessed(self, data, ip):
+		print data,'send sucessed'
+	def send_failed(self, data, ip):
+		print data, 'send failed'
 
 class Peer(object):
 	def __init__(self, peer):
 		self.peer = peer
-		self.server_address = (setting.SCRIPT_HOST, setting.SCRIPT_PORT)
-		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		self.server.setblocking(False)
-		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-		self.server.bind(self.server_address)
-		self.timeout = 3
+		# auction message server
+		self.message_server  = MessageServer(
+			setting.SCRIPT_HOST, 
+			setting.SCRIPT_PORT, 
+			MessageProtocol(self))
 		self.bidder = None
 		self.auctioneer = None
 
 	def run(self):
-		while 1:
-			try:
-				readable , writable , exceptional = select.select([self.server], [], [], self.timeout)
-			except select.error,e:
-				break
-			# When timeout reached , select return three empty lists
-			if not (readable or writable or exceptional) :
-				continue  
-			for s in readable :
-				if s is self.server:
-					data, address=s.recvfrom(1024)
-					self.receive(data, address)
+		self.message_server.start()
+		try:
+			while True:
+				command = raw_input().lower()
+				if not command or command == 'exit':
+					break
+		except KeyboardInterrupt:
+			pass
+		self.message_server.close()
 
 
 	def receive(self, data, address):
-		#print data,address
 		try:
 			peer, inst, pack = data.split(':',2)
 		except:
@@ -72,7 +83,6 @@ class Peer(object):
 		if not self.auctioneer or not self.auctioneer.running:
 			return
 		self.auctioneer.close()
-		self.auctioneer.join()
 
 	def bidder_start(self,pack):
 		if self.bidder and self.bidder.running:
@@ -93,23 +103,22 @@ class Peer(object):
 		if not self.bidder or not self.bidder.running:
 			return
 		self.bidder.close()
-		self.bidder.join()
-
 
 class CenterBase(object):
 	def __init__(self, logfname):
-		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
-		self.sender_address = (setting.UDP_BROADCAST, setting.SCRIPT_PORT)
+		self.message_client = MessageClient(
+			setting.UDP_BROADCAST,
+			setting.SCRIPT_PORT,
+			MessageProtocol(self))
 		self.logfname = logfname
 	def send(self, peer, pack):
-		repeat = 6
+		repeat = 4
 		for i in range(repeat):
-			message = ''.join([peer, ':', pack])
-			self.sender.sendto(message, self.sender_address)
+			self.message_client.broadcast(''.join([peer, ':', pack]))
 
 	''' To override '''
 	def run(self):
+		self.message_client.start()
 		print '3 seconds demo, save log into', self.logfname, '...'
 		# log
 		logger = LogServer(self.logfname)
@@ -126,7 +135,9 @@ class CenterBase(object):
 		for peer in peers:
 			self.send(peer, 'B_STOP:')
 		# log
+		time.sleep(1.0)
 		logger.close()
+		self.message_client.close()
 
 ''' Scene A '''
 class CenterA(CenterBase):
@@ -136,7 +147,9 @@ class CenterA(CenterBase):
 		print 'Scene A'
 		print 'log into', self.logfname
 		print 'waiting 400 seconds...'
-		t = 40.0#400.0
+		t = 20.0
+		# messager
+		self.message_client.start()
 		# log
 		logger = LogServer(self.logfname)
 		logger.start()
@@ -159,8 +172,9 @@ class CenterA(CenterBase):
 			self.send(peer, 'A_STOP:')
 		for peer in peers:
 			self.send(peer, 'B_STOP:')
-		# log
+		time.sleep(1.0)
 		logger.close()
+		self.message_client.close()
 
 
 def parse_args():
