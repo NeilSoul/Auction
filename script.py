@@ -153,62 +153,58 @@ class CenterA(CenterBase):
 	def run(self):
 		print 'Scene A'
 		print 'log into', self.logfname
-		print 'waiting 400 seconds...'
-		t = 400
+		print 'waiting 200 seconds...'
+		#150s
+		t1 = 100
+		t2 = 100
 		# messager
 		self.message_client.start()
 		# log
 		logger = LogServer(self.logfname)
 		logger.start()
 		# peers
-		peers = ['A', 'B', 'C']
+		peers = ['A', 'B']
 		for peer in peers:
 			self.send(peer, 'B_START:1.0')
 		for peer in peers:
-			self.send(peer, 'A_START:3.0,3')
-		time.sleep(t*0.25) # 100s
+			self.send(peer, 'A_START:2.4,3')
+		time.sleep(t1)
 		self.send('B', 'A_STOP:')
-		time.sleep(t*0.125) # 50s : 150s
-		self.send('C', 'A_STOP:')
-		time.sleep(t*0.125) # 50s : 200s
-		self.send('B', 'A_START:3.0,3')
-		time.sleep(t*0.125) # 50s : 250s
-		self.send('C', 'A_START:3.0,3')
-		time.sleep(t*0.375) # 150 : 400s
-		for peer in peers:
-			self.send(peer, 'A_STOP:')
+		time.sleep(t2)
+		self.send('A', 'A_STOP:')
 		for peer in peers:
 			self.send(peer, 'B_STOP:')
 		time.sleep(1.0)
 		logger.close()
 		self.message_client.close()
+		time.sleep(5.0)
 
 ''' Scene B'''
 class CenterB(CenterBase):
 	
 	''' @override '''
-	def run(self):
-		print 'Scene B'
+	def run(self,k):
+		print 'Scene B, k =', k
 		print 'log into', self.logfname
-		print 'waiting 400 seconds...'
-		t = 400
+		print 'waiting 200 seconds...'
+		t = 200
 		# messager
 		self.message_client.start()
 		# log
 		logger = LogServer(self.logfname)
 		logger.start()
 		# peers
-		peers = ['A', 'B', 'C', 'D']
-		for peer in peers:
+		auctioneers = ['A', 'B', 'C', 'D']
+		delays = {'A':2.0, 'B':2.0, 'C':6.0, 'D':6.0}
+		bidders = ['C', 'D']
+		for peer in bidders:
 			self.send(peer, 'B_START:1.0')
-		self.send('A', 'A_START:2.0,3')
-		self.send('B', 'A_START:6.0,3')
-		self.send('C', 'A_START:6.0,3')
-		self.send('D', 'A_START:6.0,3')
+		for peer in auctioneers:
+			self.send(peer, 'A_START:' +str(delays[peer]) + ',' + str(k))
 		time.sleep(t)
-		for peer in peers:
+		for peer in auctioneers:
 			self.send(peer, 'A_STOP:')
-		for peer in peers:
+		for peer in bidders:
 			self.send(peer, 'B_STOP:')
 		time.sleep(1.0)
 		logger.close()
@@ -218,10 +214,10 @@ class CenterB(CenterBase):
 class CenterBNo(CenterBase):
 	
 	''' @override '''
-	def run(self, peer):
-		print 'Scene B'
+	def run(self, peer,k):
+		print 'Scene B, single peer', peer, 'k = ', k
 		print 'log into', self.logfname
-		print 'waiting 400 seconds...'
+		print 'waiting 200 seconds...'
 		t = 200
 		# messager
 		self.message_client.start()
@@ -229,11 +225,9 @@ class CenterBNo(CenterBase):
 		logger = LogServer(self.logfname)
 		logger.start()
 		# peers
+		delays = {'A':2.0, 'B':2.0, 'C':6.0, 'D':6.0}
 		self.send(peer,'B_START:1.0')
-		if peer == 'A':
-			self.send('A', 'A_START:2.0,3')
-		else:
-			self.send(peer, 'A_START:6.0,3')
+		self.send(peer, 'A_START:' +str(delays[peer]) + ',' + str(k))
 		time.sleep(t)
 		self.send(peer, 'A_STOP:')
 		self.send(peer, 'B_STOP:')
@@ -288,10 +282,13 @@ if __name__=="__main__":
 		if args.script == 'Base':
 			CenterBase(args.logfile).run()
 		elif args.script == 'A':
-			for i in range(1):
-				CenterA(args.logfile +'_'+ str(i+3)+'.log').run()
+			for i in range(3):
+				CenterA(args.logfile +'_'+ str(i+1)+'.log').run()
 		elif args.script == 'B':
-			CenterB(args.logfile).run()
+			for k in [1,3,5,10]:
+				CenterB(args.logfile+'_k_'+str(k)+'.log').run(k)
+				for p in ['C','D']:
+					CenterBNo(args.logfile+'_k_'+str(k)+'_no_'+p+'.log').run(p,k)
 		elif args.script == 'E':
 			for k in [1,3,5,10]:
 				CenterE(args.logfile+'_k_'+str(k)+'.log').run(k)

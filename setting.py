@@ -36,7 +36,7 @@ AUCTIONEER_SEG_NUM = 1 # segment number per auction
 AUCTIONEER_DEFAULT_CAPACITY = 0.1 # default capacity
 AUCTIONEER_COST_TI = 0.15 # cost rebuffer coefficients
 AUCTIONEER_COST_DA = 0.15 # cost on cellular link
-AUCTIONEER_COST_WDA = 0.01 # cost on WiFi link
+AUCTIONEER_COST_WDA = 0.03 # cost on WiFi link
 AUCTIONEER_DOWNLOAD_TIMEOUT = 60 # timeout check of downloading task （1 minute）
 # M(Bidder) paramters
 BIDDER_BASIC_TH = 0.1 # basic preference
