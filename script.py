@@ -282,8 +282,8 @@ if __name__=="__main__":
 		if args.script == 'Base':
 			CenterBase(args.logfile).run()
 		elif args.script == 'A':
-			for i in range(3):
-				CenterA(args.logfile +'_'+ str(i+1)+'.log').run()
+			for i in range(1):
+				CenterA(args.logfile +'_'+ str(i+3)+'.log').run()
 		elif args.script == 'B':
 			for k in [1,3,5,10]:
 				CenterB(args.logfile+'_k_'+str(k)+'.log').run(k)

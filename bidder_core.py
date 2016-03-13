@@ -89,8 +89,8 @@ class BidderCore(object):
 		''' deprecated r = float(rate) / 1024 / 1024
 		return self.k_br / math.sqrt(self.basic_preference + 0.5*self.k_theta) * math.exp(r *cti + r*r - 1)
 		'''
-		return self.valuations[rate]
-		#return 0.5 +float(rate) / 1024 / 1024
+		#return self.valuations[rate]
+		return 0.5 +float(rate) / 1024 / 1024
 		#return 2.0*math.log(1+float(rate)/1024/1024)
 
 # unit test
