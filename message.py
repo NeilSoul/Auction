@@ -1,111 +1,255 @@
 #!usr/bin/env python
+# -*- coding: UTF-8 -*-
 import socket
 import select
-import Queue
 import threading
+import struct
 
-""" 
+'''
 Message Protocol
-Include sever and client.
-"""
-class Protocol(object):
-	''' server callback '''
-	def data_received(self, data, ip):
+'''
+class MessageProtocol(object):
+	def on_msg_from_peer(self, data, peer):
 		pass
-	''' client callback '''
-	def send_sucessed(self, data, ip):
-		pass
-	def send_failed(self, data, ip):
-		pass
+'''
+Message
+'''
+class Message(object):
 
-"""
-Message Server & Message Client
-"""
-class MessageServer(object):
-	def __init__(self, host, port, protocol):
-		self.running = 1 
-		#create a listenning socket
-		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	def __init__(self, host, iport, oport, protocol):
+		# properties
+		self.host = host
+		self.iport = iport
+		self.oport = oport
+		self.protocol = protocol
+		self.socks = {} # {peer:sock}
+
+	def message(self):
+		# sockets
+		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.server.setblocking(False)
-		#set option reused
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-		self.server_address= (host,port)
-		self.server.bind(self.server_address)
-		#A optional parameter for select  is TIMEOUT
-		self.timeout = 1
-		#Protocol of message
-		self.protocol = protocol 
-
-	def listen(self):
+		self.server.bind((self.host, self.iport))
+		self.server.listen(10)
+		self.inputs = [self.server]
+		self.peers = {} # {sock:peer}
+		self.messages = {} # {sock:message}
+		self.lengths = {} # {sock:length}
+		self.timeout = 1.0
 		while self.running:
 			try:
-				readable , writable , exceptional = select.select([self.server], [], [], self.timeout)
+				readable , writable , exceptional = select.select(self.inputs, [], self.inputs, self.timeout)
 			except select.error,e:
 				break
 			# When timeout reached , select return three empty lists
 			if not (readable or writable or exceptional) :
-				continue
-			for s in readable :
+				continue 
+			for s in readable:
 				if s is self.server:
-					# Receive message from broadcast
-					data, address=s.recvfrom(1024)
-					self.protocol.data_received(data, address[0])
+				    # A "readable" socket is ready to accept a connection
+				    connection, address = s.accept()
+				    connection.setblocking(0)
+				    self.inputs.append(connection)
+				    self.peers[connection] = address[0]
+				elif s in self.peers:
+					try:
+						if not s in self.messages:
+							bytes = s.recv(4)
+							l, = struct.unpack('!i', bytes)
+							bytes = s.recv(l)
+							if len(bytes) == l:
+								self.protocol.on_msg_from_peer(bytes, self.peers[s])
+							else:
+								self.messages[s] = bytes
+								self.lengths[s] = l - len(bytes)
+						else:
+							l = self.lengths[s]
+							bytes = s.recv(l)
+							self.messages[s] = self.messages[s].append(bytes)
+							if len(bytes) == l:
+								self.protocol.on_msg_from_peer(bytes, self.peers[s])
+								del self.messages[s]
+								del self.lengths[s]
+							else:
+								self.lengths[s] = l - len(bytes)
+					except:
+						s.close()
+						del self.peers[s]
+						if s in self.messages:
+							del self.messages[s]
+							del self.lengths[s]
+						self.inputs.remove(s)
+					'''
+				    bytes = s.recv(1024)
+				    if bytes :
+				    	self.protocol.on_msg_from_peer(bytes, self.peers[s])
+				    else:
+				        #Interpret empty result as closed connection
+						del self.peers[s]
+						self.inputs.remove(s)
+					'''
+			for s in exceptional:
+				if s in self.peers:
+					s.close()
+					del self.peers[s]
+					self.inputs.remove(s)
 		self.server.close()
 
-	def start(self):
-		self.listenThread = threading.Thread(target = self.listen)
-		self.listenThread.start()
-
-	def join(self):
-		self.listenThread.join()
+	def run(self):
+		self.running = 1
+		threading.Thread(target=self.message).start()
 
 	def close(self):
+		for peer in self.socks.keys():
+			self.disconnect_peer_if_need(peer)
 		self.running = 0
 
-class MessageClient(object):
-	def __init__(self, broadcast, port, protocol):
-		self.running = 1
-		#create a sending socket
-		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
-		self.sender.setblocking(False)
-		self.broadhost = broadcast
-		self.port = port
-		#Outgoing message queue
-		self.message_queue = Queue.Queue()
-		#A optional parameter for  queue is TIMEOUT
-		self.timeout = 1
-		#Protocol of message
-		self.protocol = protocol 
+	# Open API
+	def connect_peer_if_need(self, peer):
+		if not peer in self.socks:
+			try:
+				# create a socket
+				sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+				sock.connect((peer, self.oport))
+				# TODO timeout, setblocking
+				# save the socket
+				self.socks[peer] = sock
+			except:
+				#print 'error when connect to peer', peer
+				pass
 
-	def message(self):
+	def disconnect_peer_if_need(self, peer):
+		if peer in self.socks:
+			sock = self.socks[peer]
+			# delete socket 
+			del self.socks[peer]
+			# close socket
+			sock.close()
+
+	def sendto(self, peer, data):
+		# TODO timeout or nonblocking
+		self.connect_peer_if_need(peer)
+		try:
+			sock = self.socks[peer]
+			pack = struct.pack('!i%ds' % len(data), len(data), data)
+			sock.sendall(pack)
+		except:
+			sock.close()
+			try:
+				# renew the socket
+				sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+				sock.connect((peer, self.port))
+				self.socks[peer] = sock
+				sock.sendall(pack)
+			except:
+				self.disconnect_peer_if_need(peer)
+
+'''
+Message Client
+'''
+class MessageClient(object):
+	def __init__(self, port, protocol):
+		# properties
+		self.port = port
+		self.protocol = protocol
+		# sockets
+		self.socks = {} # {peer:sock}
+
+	# Open API
+	def connect_peer_if_need(self, peer):
+		if not peer in self.socks:
+			try:
+				# create a socket
+				sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+				sock.connect((peer, self.port))
+				# TODO timeout, setblocking
+				# save the socket
+				self.socks[peer] = sock
+			except:
+				#print 'error when connect to peer', peer
+				pass
+
+	def disconnect_peer_if_need(self, peer):
+		if peer in self.socks:
+			sock = self.socks[peer]
+			# delete socket 
+			del self.socks[peer]
+			# close socket
+			sock.close()
+
+	def sendto(self, peer, data):
+		# TODO timeout or nonblocking
+		self.connect_peer_if_need(peer)
+		try:
+			sock = self.socks[peer]
+			sock.sendall(data)
+		except:
+			sock.close()
+			try:
+				# renew the socket
+				sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+				sock.connect((peer, self.port))
+				self.socks[peer] = sock
+				sock.sendall(data)
+			except:
+				self.disconnect_peer_if_need(peer)
+
+	def close(self):
+		for peer in self.socks.keys():
+			self.disconnect_peer_if_need(peer)
+
+'''
+Message Server
+'''
+class MessageServer(object):
+
+	def __init__(self, host, port, protocol):
+		# properties
+		self.host = host
+		self.port = port
+		self.protocol = protocol
+		# sockets
+		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		self.server.setblocking(False)
+		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+		self.server.bind((host,port))
+		self.server.listen(10)
+		self.inputs = [self.server]
+		self.peers = {} # {sock:peer}
+		self.timeout = 1.0
+
+	def listen(self):
 		while self.running:
 			try:
-				next_msg, next_ip = self.message_queue.get(timeout=self.timeout)
-			except:
-				# When timeout reached , Queue raise an Empty Error
-				continue
-			try:
-				self.sender.sendto(next_msg, (next_ip, self.port))
-			except:
-				self.protocol.send_failed(next_msg, next_ip)
-		self.sender.close()
-		#del self.message_queue
+				readable , writable , exceptional = select.select(self.inputs, [], self.inputs, self.timeout)
+			except select.error,e:
+				break
+			# When timeout reached , select return three empty lists
+			if not (readable or writable or exceptional) :
+				continue 
+			for s in readable:
+				if s is self.server:
+				    # A "readable" socket is ready to accept a connection
+				    connection, address = s.accept()
+				    connection.setblocking(0)
+				    self.inputs.append(connection)
+				    self.peers[connection] = address[0]
+				elif s in self.peers:
+				    data = s.recv(1024)
+				    if data :
+				    	self.protocol.on_msg_from_peer(data, self.peers[s])
+				    else:
+				        #Interpret empty result as closed connection
+						del self.peers[s]
+						self.inputs.remove(s)
+			for s in exceptional:
+				if s in self.peers:
+					del self.peers[s]
+					self.inputs.remove(s)
 
-	def sendto(self, ip, message):
-		self.message_queue.put((message, ip))
-
-	def broadcast(self, message):
-		self.message_queue.put((message, self.broadhost))
-
-	def start(self):
-		self.messageThread = threading.Thread(target = self.message)
-		self.messageThread.start()
-
-	def join(self):
-		self.messageThread.join()
+	def run(self):
+		self.running = 1
+		threading.Thread(target=self.listen).start()
 
 	def close(self):
 		self.running = 0
-		#self.message_queue.put(("EXIT", "ERROR_IP"))#important!

@@ -11,7 +11,6 @@ import threading
 import time
 import urllib2
 import os
-import log
 
 FILE_BOF = 'B'.encode()
 FILE_SEP = '#'.encode()
@@ -37,25 +36,14 @@ Transport Server
 """
 class TransportServer(object):
 	def __init__(self, host, port, protocol):
-		self.running = 1 
-		#create a socket
-		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-		self.server.setblocking(False)
-		#set option reused
-		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR  , 1)
-		self.server_address= (host,port)
-		self.server.bind(self.server_address)
-		self.server.listen(10)
-
-		self.inputs = [self.server]
+		self.host = host
+		self.port = port
 		#buffer indexs (socket : buffer index)
 		self.indexs = {}
 		#buffer lists (socket : list)
 		self.lists = {}
-
 		#A optional parameter for select is TIMEOUT
 		self.timeout = 3
-
 		#Protocol 
 		self.protocol = protocol
 
@@ -87,6 +75,15 @@ class TransportServer(object):
 			self.lists[sock].append(data)
 
 	def listen(self):
+		#create a socket
+		self.server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		self.server.setblocking(False)
+		#set option reused
+		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR  , 1)
+		self.server_address= (self.host, self.port)
+		self.server.bind(self.server_address)
+		self.server.listen(10)
+		self.inputs = [self.server]
 		while self.running and self.inputs:
 			try:
 				readable , writable , exceptional = select.select(self.inputs, [], self.inputs, self.timeout)
@@ -116,6 +113,7 @@ class TransportServer(object):
 
 	'Loop Methods'
 	def start(self):
+		self.running = 1 
 		self.listenThread = threading.Thread(target = self.listen)
 		self.listenThread.start()
 
@@ -156,10 +154,12 @@ class TransportClient(object):
 				data_length += len(data)
 			sock.close()
 			self.protocol.send_successed(index)
+			success = True
 		except:
 			self.protocol.send_failed(index)
+			success = False
 		tend = time.time()
-		return data_length, tend-tbegin#data_length /(tend - tbegin)/1024/1024
+		return data_length, tend-tbegin, success#data_length /(tend - tbegin)/1024/1024
 
 	# thread function
 	def ttransport(self, ip, index, from_url):

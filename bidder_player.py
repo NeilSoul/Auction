@@ -12,38 +12,40 @@ class BidderPlayer(object):
 		self.factory = factory
 		self.url = factory.streaming_url
 		self.silent = factory.silent
-		self.fname_of_buffer = factory.fname_of_buffer
-		self.command_of_player = factory.command_of_player
+		self.buffer_folder = factory.buffer_folder
 
 	def prepare2play(self):
-		print '[m3u8 parsing]... url = ', self.url
+		print '[B  parsing m3u8] url = %s ...' % self.url
 		self.descriptor_list = parse_m3u8(self.url)
 		self.rate_list = sorted(self.descriptor_list[0][1].keys())
 		# streaming parameters
 		self.segment_number = len(self.descriptor_list)
 		self.segment_duration = self.descriptor_list[0][0]
 		self.max_rate = self.rate_list[-1]
-		print '[m3u8 parsed] segments = ', len(self.descriptor_list),'duration = ', self.segment_duration, 
-		print '(s), rates = ', map(lambda r:float(r)/1024/1024, self.rate_list), '(mbps)'
+		print '[B  parsing finished] segments=%d, duration=%0.2f(s), rates=%s (mbps)' % (len(self.descriptor_list), self.segment_duration, str(map(lambda r:float(r)/1024/1024, self.rate_list)))
 		# clear player
 		self.clear_player()
 		# mark for real streaming 
 		self.had_actually_played = 0
 
 	def clear_player(self):
+		files = os.listdir(self.buffer_folder)
 		try:
-			os.remove(self.fname_of_buffer)
-		except:
-			pass
+			for f in files:
+				filePath = os.path.join(self.buffer_folder, f)
+				if os.path.isfile(filePath):
+					os.remove(filePath)
+		except Exception, e:
+			print e
 
 	def play(self):
 		self.running = 1
 		# streaming engine
 		self.played_queue = Queue() # [(index, bytes_of_data)]
-		if self.silent:# at first full buffer , SPECIAL
+		'''if self.silent:# at first full buffer , SPECIAL
 			buffer_num = self.factory.bidder_params['mbuf'] / self.segment_duration
 			for i in range(int(buffer_num)):
-				self.played_queue.put((0, None))
+				self.played_queue.put((0, None))'''
 		self.played_cond = threading.Condition()
 		threading.Thread(target = self.streaming).start()
 
@@ -59,23 +61,25 @@ class BidderPlayer(object):
 		playing_mark = time.time()
 		while self.running:
 			try:
-				index, bytes = self.played_queue.get(timeout=1)
+				index, segment = self.played_queue.get(timeout=1)
+				f_rate, bytes = segment
 			except:
 				continue
 			# record rebuffer
 			delay = time.time() - playing_mark
 			rebuffer += delay
 			duration = self.descriptor_list[index][0]
-			print '[playing ]No.', index, ', duration = ', duration, '(s), delay = ', round(delay,3), '(s), buffer =', self.get_buffer(), '(s), rebuffer = ', round(rebuffer,3) ,'(s)'
+			print '[B    playing] No.%d, rate=%0.2f(mbps), duration=%0.2f(s), delay=%0.2f(s), buffer=%0.2f(s), rebuffer=%0.2f(s)' % (index, f_rate, duration, delay, self.get_buffer(), rebuffer)
+			#logging
+			self.factory.logger.slave_play([f_rate, duration, delay])
 			# write into real file
 			if not self.silent:
 				wstart = time.time()
 				try:
-					with open(self.fname_of_buffer, 'ab') as f:
-						#buffered
+					fname = os.path.join(self.buffer_folder, str(index).zfill(3)+".ts")
+					with open(fname, 'w') as f:
 						f.write(bytes)
-						if not self.had_actually_played :
-							threading.Thread(target = self.realstreaming).start()
+						f.close()
 				finally:
 					duration -= time.time() - wstart
 					if duration < 0:
@@ -89,12 +93,6 @@ class BidderPlayer(object):
 			# if the end?
 			if index >= self.segment_number - 1:
 				break 
-
-	def realstreaming(self):
-		self.had_actually_played = 1
-		p = subprocess.Popen(self.command_of_player.split() + [self.fname_of_buffer],stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		p.wait()
-		self.factory.close()
 
 	''' descriptor info '''
 	def get_segment_number(self):
@@ -120,8 +118,8 @@ class BidderPlayer(object):
 		return self.played_queue.qsize() * self.segment_duration
 
 	''' control '''
-	def segment_received(self, index, data):
-		played_entry = (index, data)
+	def segment_received(self, index, segment):
+		played_entry = (index, segment)
 		self.played_queue.put(played_entry)
 
 

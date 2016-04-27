@@ -7,19 +7,22 @@ import time
 from Queue import PriorityQueue
 import argparse
 import setting
-import message
 import transport
-import log
+from discovery import Broadcaster
+from message import MessageProtocol
+from message import Message
 from parser import parse_m3u8
 from bidder_core import BidderCore
 from bidder_player import BidderPlayer
 
-class BidderProtocol(message.Protocol):
+#TODO logger is not a known instance to bidder
+
+class BidderProtocol(MessageProtocol):
+
 	def __init__(self, factory):
 		self.factory = factory
 
-	''' bidder server callback '''
-	def data_received(self, data, ip):
+	def on_msg_from_peer(self, data, peer):
 		# get peer info
 		try:
 			inst, info = data.split(':',1)
@@ -27,11 +30,12 @@ class BidderProtocol(message.Protocol):
 			return
 		# parse data
 		if inst == 'AUCTION':# receive an auction
-			self.factory.bid(ip, info)
+			self.factory.bid(peer, info)
 		elif inst == 'WIN':# win a bid
-			self.factory.send_task(ip, info)
+			self.factory.send_task(peer, info)
 
 class TransportProtocol(transport.Protocol):
+
 	def __init__(self, factory):
 		self.factory = factory
 	''' bidder server callback '''
@@ -46,24 +50,23 @@ class TransportProtocol(transport.Protocol):
 		
 
 class Bidder(object):
-	def __init__(self, peername, url, silent, bidder_params):
+	def __init__(self, bidder_params, logger):
 		# INIT properties
-		self.peername = peername
-		self.silent = silent
-		self.streaming_url = url
 		self.bidder_params = bidder_params
-		self.fname_of_buffer = setting.PLAYER_BUFFER
-		self.command_of_player = setting.PLAYER_COMMAND
-		# bidder message server
-		self.message_server  = message.MessageServer(
-			setting.UDP_HOST, 
-			setting.UDP_BID_PORT, 
+		self.peername = bidder_params['peer']
+		self.silent = bidder_params['silent']
+		self.streaming_url = bidder_params['url']
+		self.buffer_folder = setting.BUFFER_DIR
+		# discovery center
+		self.discovery_center = Broadcaster(
+			bidder_params['broadcast'], 
+			setting.DIS_BID_PORT)
+		# message center
+		self.message_center = Message(
+			setting.MSG_HOST, 
+			setting.MSG_BID_PORT, 
+			setting.MSG_AUC_PORT, 
 			BidderProtocol(self))
-		# bidder sender
-		self.message_client = message.MessageClient(
-			bidder_params['broadcast'],
-			setting.UDP_AUCTION_PORT,
-			message.Protocol())
 		# transport center
 		self.transport_center = transport.TransportServer(
 			setting.TRP_HOST,
@@ -72,36 +75,37 @@ class Bidder(object):
 		# player
 		self.player = BidderPlayer(self)
 		# log center
-		self.logger = log.LogClient(peername, bidder_params['broadcast'])
-		self.logger.add_peer(peername)
+		self.logger = logger #self.logger = log.LogClient(peername, bidder_params['broadcast'])
+		self.running = 0
 		
-
 	""" Bidder(receiver, player) Life Cycle """
-	def start(self):
-		print 'Bidder', self.peername, '[ kcapacity = ', self.bidder_params['kcapacity'],'] running...'
+	def run(self):
+		print ''
+		print '### Bidder', self.peername, '( kcapacity = ', self.bidder_params['kcapacity'],') running...'
+		print ''
 		self.running = 1
 		self.prepare()
 		self.player.play()
-		self.message_server.start()
-		self.message_client.start()
+		self.discovery_center.run()
+		self.message_center.run()
 		self.transport_center.start()
 		
 
 	def join(self):
-		self.message_server.join()
-		self.message_client.join()
 		self.transport_center.join()
 
 	def close(self):
-		self.message_server.close()
-		self.message_client.close()
+		self.discovery_center.close()
+		self.message_center.close()
 		self.transport_center.close()
 		self.player.close()
 		self.running = 0
 		self.task_timeout_cond.acquire()
 		self.task_timeout_cond.notify()
 		self.task_timeout_cond.release()
-		print 'Bidder', self.peername, 'stopped'
+		print ''
+		print '### Bidder', self.peername, 'stopped'
+		print ''
 
 	def prepare(self):
 		self.player.prepare2play()
@@ -111,9 +115,9 @@ class Bidder(object):
 		self.auction_waiting_queue = PriorityQueue()
 		for i in range(self.player.get_segment_number()):
 			self.auction_waiting_queue.put(i)
-		# wait for retrieve : dictionary (index:time)
+		# wait for retrieve : dictionary { index: (rate,time) }
 		self.retrieving = {}
-		# retrieved : dictionary (index:data)
+		# retrieved : dictionary  { index:(rate,data) }
 		self.retrieved = {}
 		self.task_cond = threading.Condition()
 		threading.Thread(target=self.task_loop, args=(1.0, )).start()
@@ -138,10 +142,10 @@ class Bidder(object):
 			# unpack
 			auction_peer, auction_index, bid = bid_pack
 			# logging
-			self.logger.bid_send(self.peername, auction_peer, auction_index, self.buffer_size(), bid)
+			#self.logger.log('B', [self.peername, auction_peer, auction_index, self.buffer_size(), bid])
 			# response
 			bid_info = ','.join([auction_index, str(bid)])
-			self.message_client.sendto(ip, ':'.join(['BID', bid_info]))
+			self.message_center.sendto(ip, ':'.join(['BID', bid_info]))
 
 	def send_task(self, ip, info):
 		segment_allocated, rate = map(lambda a:int(a), info.split(','))
@@ -149,22 +153,23 @@ class Bidder(object):
 		while segment_allocated > 0 and not self.auction_waiting_queue.empty():
 			index = self.auction_waiting_queue.get()
 			task_url = self.player.get_segment_url(index, rate)
-			print '[sended  ]No.',index,' rate = ', float(rate)/1024/1024 
+			f_rate = float(rate)/1024/1024  
+			print '[B     sended] No.%d, rate=%0.2f(mbps)' % (index, f_rate)
 			# send it to bidder
-			self.retrieving[index] = time.time()
-			self.message_client.sendto(ip, 'TASK:'+str(index)+','+task_url)
+			self.retrieving[index] = (f_rate, time.time())
+			self.message_center.sendto(ip, 'TASK:'+str(index)+','+task_url)
 			segment_allocated = segment_allocated - 1
 
 	""" Transport Factory """
 	def receive_trunk(self, ip, index, data):
-		print '[received]No.', index, ', size =', round(float(len(data))/1024/128,3), '(mb), buffer =', self.buffer_size(),'(s)'
+		print '[B   received] No.%s, size=%0.2f(mb), buffer=%0.2f(s)' % (index, float(len(data))/1024/128, self.buffer_size())
 		# discard wild data
 		if not index in self.retrieving: 
 			return
-		del self.retrieving[index]
 		# retrieve thread safe
 		self.task_cond.acquire()
-		self.retrieved[index] = data
+		self.retrieved[index] = (self.retrieving[index][0], data)
+		del self.retrieving[index]
 		self.task_cond.notify()
 		self.task_cond.release()
 		
@@ -180,7 +185,7 @@ class Bidder(object):
 		while self.running:
 			now = time.time()
 			for index in self.retrieving:#TODO thread safe
-				if self.retrieving[index] - now > timeout:
+				if self.retrieving[index][1] - now > timeout:
 					del self.retrieving[index]
 					self.auction_waiting_queue.put(index)
 			#time.sleep(timeout)
@@ -201,6 +206,10 @@ class Bidder(object):
 				self.ready_index = self.ready_index + 1
 			self.task_cond.release()
 
+#UNIT TEST
+
+from controller import Slave
+
 def parse_args():
 	parser = argparse.ArgumentParser(description='Bidder')
 	parser.add_argument('-p','--peer', required=False, default='Peer', help='name of peer')
@@ -215,7 +224,11 @@ def parse_args():
 	parser.add_argument('-k','--kcapacity', default=1.0, type=float, help='bidder capacity coefficient')
 	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
+	# pack to dict
 	bidder_params = {}
+	bidder_params['peer'] = args.peer
+	bidder_params['url'] = args.url
+	bidder_params['silent'] = args.silent
 	bidder_params['theta'] = args.theta
 	bidder_params['kqv'] = args.quality
 	bidder_params['kbuf'] = args.buffer 
@@ -224,12 +237,18 @@ def parse_args():
 	bidder_params['mbuf'] = args.mbuffer
 	bidder_params['kcapacity'] = args.kcapacity
 	bidder_params['broadcast'] = args.broadcast
-	return args.peer, args.url, args.silent, bidder_params
+	return bidder_params
 
 if __name__ == "__main__":
-	peer, url, silent, bidder_params = parse_args()
-	bidder  = Bidder(peer, url, silent, bidder_params)
-	bidder.start()
+	# params
+	bidder_params = parse_args()
+	# logger
+	logger = Slave(auctioneer_params['peer'])
+	logger.run()
+	logger.introduce()
+	# bidder
+	bidder  = Bidder(bidder_params, logger)
+	bidder.run()
 	try:
 		while True:
 			command = raw_input().lower()
@@ -238,4 +257,5 @@ if __name__ == "__main__":
 	except KeyboardInterrupt:
 		pass
 	bidder.close()
-	bidder.join()
+	logger.close()
+

@@ -1,27 +1,39 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
-# UDP Message Protocols
-UDP_HOST = ''
-UDP_BROADCAST = '192.168.1.255'#'<broadcast>'#
-UDP_AUCTION_PORT = 9000
-UDP_BID_PORT = 9001
+# UDP Broadcast Address
+UDP_BROADCAST = '<broadcast>'
+#UDP_BROADCAST = '192.168.1.255'#specified network interface
 
-# TCP Transport Protocols
+# Discovery Protocols
+DIS_HOST = '0.0.0.0'
+DIS_AUC_PORT = 9010
+DIS_BID_PORT = 9011
+
+# Message Protocols
+MSG_HOST = '0.0.0.0'
+MSG_AUC_PORT = 9020
+MSG_BID_PORT = 9021
+
+# Transport Protocols
 TRP_HOST = '0.0.0.0'
-TRP_PORT = 9002
+TRP_PORT = 9030
 
-# Logger
-LOG_HOST = ''
-LOG_PORT = 9008
+
+# Controller Protocols
+CTR_HOST = ''
+CTR_MASTER_BCAST_PORT = 9040
+CTR_MASTER_PORT = 9041
+CTR_SLAVE_PORT = 9042
+
+# Logger Folder
 LOG_DIR = 'log'
 
-# Script
-SCRIPT_HOST = ''
-SCRIPT_PORT = 8990
+# Buffer Folder
+BUFFER_DIR = 'buffer'
 
 
-# Player Buffer
+# About Player
 #PLAYER_DEFAULT_URL = "http://devstreaming.apple.com/videos/wwdc/2015/413eflf3lrh1tyo/413/hls_vod_mvp.m3u8"
 #PLAYER_DEFAULT_URL ="http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8"
 #PLAYER_DEFAULT_URL ="http://115.28.222.35/fruit.m3u8"
@@ -38,10 +50,39 @@ AUCTIONEER_COST_TI = 0.15 # cost rebuffer coefficients
 AUCTIONEER_COST_DA = 0.15 # cost on cellular link
 AUCTIONEER_COST_WDA = 0.0#0.03 # cost on WiFi link
 AUCTIONEER_DOWNLOAD_TIMEOUT = 60 # timeout check of downloading task （1 minute）
-# M(Bidder) paramters
+
+# M(Bidder) parameters
 BIDDER_BASIC_TH = 0.1 # basic preference
 BIDDER_MAX_BUF = 40 # maximum buffer size
 BIDDER_K_QV = 0.2
 BIDDER_K_BUF = 0.01
 BIDDER_K_THETA = 10
 BIDDER_K_BR = 1.5
+
+# Package
+def default_auctioneer_params(peername):
+	auctioneer_params = {}
+	auctioneer_params['peer'] = peername
+	auctioneer_params['segment'] = AUCTIONEER_SEG_NUM
+	auctioneer_params['capacity'] = AUCTIONEER_DEFAULT_CAPACITY
+	auctioneer_params['timecost'] = AUCTIONEER_COST_TI
+	auctioneer_params['cellular'] = AUCTIONEER_COST_DA
+	auctioneer_params['wifi'] = AUCTIONEER_COST_WDA
+	auctioneer_params['delay'] = 1.0
+	auctioneer_params['broadcast'] = UDP_BROADCAST
+	return auctioneer_params 
+
+def default_bidder_params(peername):
+	bidder_params = {}
+	bidder_params['peer'] = peername
+	bidder_params['url'] = PLAYER_DEFAULT_URL
+	bidder_params['silent'] = False
+	bidder_params['theta'] = BIDDER_BASIC_TH
+	bidder_params['kqv'] = BIDDER_K_QV
+	bidder_params['kbuf'] = BIDDER_K_BUF
+	bidder_params['ktheta'] = BIDDER_K_THETA
+	bidder_params['kbr'] = BIDDER_K_BR
+	bidder_params['mbuf'] = BIDDER_MAX_BUF
+	bidder_params['kcapacity'] = 1.0
+	bidder_params['broadcast'] = UDP_BROADCAST
+	return bidder_params

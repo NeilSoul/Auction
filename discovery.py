@@ -6,19 +6,55 @@ import select
 import threading
 import time
 
-# Discovery Protocols
-DIS_HOST = '0.0.0.0'
-DIS_PORT = 5190
+class Broadcaster(object):
 
-class DiscoveryProtocol(object):
+	def __init__(self, bcast, port):
+		# open property
+		self.bcast = bcast
+		self.port = port
+		# timeout & close conditions
+		self.bcast_close_cond = threading.Condition()
+		self.bcast_timeout = 0.3
 
-	def onPeerJoin(self, peer):
+	def _broadcast(self):
+		# sender socket
+		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
+		#self.sender.setblocking(False)
+		while self.running:
+			try:
+				self.sender.sendto('JOIN', (self.bcast, self.port))
+			except:
+				pass
+			self.bcast_close_cond.acquire()
+			self.bcast_close_cond.wait(self.bcast_timeout)
+			self.bcast_close_cond.release()
+		try:
+			self.sender.sendto('LEAV', (self.bcast, self.port))
+		except:
+			pass
+		self.sender.close()
+
+	def run(self):
+		self.running = 1
+		threading.Thread(target=self._broadcast).start()
+
+	def close(self):
+		self.running = 0
+		self.bcast_close_cond.acquire()
+		self.bcast_close_cond.notify()
+		self.bcast_close_cond.release()
+		
+
+class ListenerProtocol(object):
+
+	def on_peer_join(self, peer):
 		pass
 
-	def onPeerLeave(self, peer):
+	def on_peer_leave(self, peer):
 		pass
 
-class Discovery(object):
+class Listener(object):
 
 	def __init__(self, host, port, protocol):
 		# open property
@@ -26,37 +62,32 @@ class Discovery(object):
 		self.port = port
 		self.protocol = protocol
 		self.peers = {}# {peer:time_updated}
-		# socket
+		# refresh timeout & close conditions
+		self.refresh_close_cond = threading.Condition()
+		self.refresh_timeout = 3
+
+
+	def _add_peer_if_need(self, peer):
+		if not peer in self.peers:
+			self.peers[peer] = time.time()
+			self.protocol.on_peer_join(peer)
+		else:
+			self.peers[peer] = time.time()
+
+	def _remove_peer_if_need(self, peer):
+		if peer in self.peers:
+			del self.peers[peer]
+			self.protocol.on_peer_leave(peer)
+
+	def _listen(self):
+		# server socket
 		self.server = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 		self.server.setblocking(False)
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-		self.server_address= (host,port)
-		self.server.bind(self.server_address)
-		self.sender = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		self.sender.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
-		self.sender.setblocking(False)
+		self.server.bind((self.host,self.port))
+		# socket timeout
 		self.socket_timeout = 1
-		# conditions
-		self.broadcast_cond = threading.Condition()
-		self.broadcast_timeout = 1
-		self.refresh_cond = threading.Condition()
-		self.refresh_timeout = 2
-
-
-	def peerJoin(self, peer):
-		if not peer in self.peers:
-			self.peers[peer] = time.time()
-			self.protocol.onPeerJoin(peer)
-		else:
-			self.peers[peer] = time.time()
-
-	def peerLeave(self, peer):
-		if peer in self.peers:
-			del self.peers[peer]
-			self.protocol.onPeerLeave(peer)
-
-	def listen(self):
 		while self.running:
 			try:
 				readable , writable , exceptional = select.select([self.server], [], [], self.socket_timeout)
@@ -69,74 +100,68 @@ class Discovery(object):
 				if s is self.server:
 					# Receive message from broadcast
 					try:
-						data, address=s.recvfrom(1024)
-						inst, info = data.split(':',1)
+						data, address=s.recvfrom(4)
+						if data == 'JOIN':# a peer join
+							self._add_peer_if_need(address[0])
+						elif data == 'LEAV':# a peer leave
+							self._remove_peer_if_need(address[0])
 					except:
 						continue
-					# parse data
-					if inst == 'JOIN':# a peer join
-						self.peerJoin(address[0])
-					elif inst == 'LEAVE':# a peer leave
-						self.peerLeave(address[0])
 		self.server.close()
 
-	def broadcast(self):
-		while self.running:
-			try:
-				self.sender.sendto('JOIN:', (self.host, self.port))
-			except:
-				pass
-			self.broadcast_cond.acquire()
-			self.broadcast_cond.wait(self.broadcast_timeout)
-			self.broadcast_cond.release()
-		self.sender.sendto('LEAVE:', (self.host, self.port))
-		self.sender.close()
-
-	def refresh(self):
+	def _refresh(self):
 		while self.running:
 			current = time.time()
-			for peer in self.peers:
+			for peer in self.peers.keys():
 				if current - self.peers[peer] > self.refresh_timeout:
-					self.peerLeave(peer)
-			self.refresh_cond.acquire()
-			self.refresh_cond.wait(self.refresh_timeout)
-			self.refresh_cond.release()
+					self._remove_peer_if_need(peer)
+			self.refresh_close_cond.acquire()
+			self.refresh_close_cond.wait(self.refresh_timeout)
+			self.refresh_close_cond.release()
 
 	def run(self):
 		self.running = 1
-		threading.Thread(target=self.listen).start()
-		threading.Thread(target=self.broadcast).start()
-		threading.Thread(target=self.refresh).start()
+		threading.Thread(target=self._listen).start()
+		threading.Thread(target=self._refresh).start()
 
 	def close(self):
-		self.broadcast_cond.acquire()
-		self.broadcast_cond.notify()
-		self.broadcast_cond.release()
-		self.refresh_cond.acquire()
-		self.refresh_cond.notify()
-		self.refresh_cond.release()
 		self.running = 0
+		self.refresh_close_cond.acquire()
+		self.refresh_close_cond.notify()
+		self.refresh_close_cond.release()
+		
 
-# UNION TEST
-class UnitTest(DiscoveryProtocol):
+# UNIT TEST
+class ListenerUnitTest(ListenerProtocol):
 
 	def __init__(self):
-		self.discovery = Discovery('0.0.0.0', 5190, self)
+		self.listener = Listener('0.0.0.0', 9001, self)
 
-	def onPeerJoin(self, peer):
+	def on_peer_join(self, peer):
 		print peer, 'join.'
 
-	def onPeerLeave(self, peer):
+	def on_peer_leave(self, peer):
 		print peer, 'leave.'
 
-	def test(self):
-		self.discovery.run()
-		for i in range(10):
-			print self.discovery.peers
-			time.sleep(1.0)
-		self.discovery.close()
+	def run(self):
+		self.listener.run()
+
+	def close(self):
+		self.listener.close()
 
 if __name__ == '__main__':
-	unit = UnitTest()
-	unit.test()
+	b = Broadcaster('<broadcast>', 9001)
+	b.run()
+	l = ListenerUnitTest()
+	l.run()
+	for i in range(3):
+		print l.listener.peers
+		time.sleep(1.0)
+	b.close()
+	for i in range(3):
+		print l.listener.peers
+		time.sleep(1.0)
+	l.close()
+
+	
 

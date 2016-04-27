@@ -1,12 +1,16 @@
 #!usr/bin/env python
+# -*- coding: UTF-8 -*-
+
 import threading
 import time
 import argparse
 import setting
-import message
 import transport
-import log
 from Queue import Queue
+from discovery import ListenerProtocol
+from discovery import Listener
+from message import MessageProtocol
+from message import Message
 from auctioneer_core import AuctioneerCore
 
 """ Auctioneer(Downloader)
@@ -16,12 +20,12 @@ Life Cycle:
 	idle --> auction | waiting--> decide | timeout--> receive tasks --> downloading tasks -> idle --> ...
 	                 --> not yet | timeout --> idle --> ...
 """
-class AuctionProtocol(message.Protocol):
+class AuctionProtocol(MessageProtocol):
 
 	def __init__(self, factory):
 		self.factory = factory
-	''' auction server callback '''
-	def data_received(self, data, ip):
+
+	def on_msg_from_peer(self, data, peer):
 		# parse instruction
 		try:
 			inst, info = data.split(':',1)
@@ -29,51 +33,43 @@ class AuctionProtocol(message.Protocol):
 			return
 		# divide instructions
 		if inst == 'BID':
-			self.factory.receive_bid(ip, info)
+			self.factory.receive_bid(peer, info)
 		if inst == 'TASK':
-			self.factory.receive_task(ip,info)
+			self.factory.receive_task(peer,info)
 
-class TransportProtocol(transport.Protocol):
+class Auctioneer(ListenerProtocol):
 
-	def __init__(self, factory):
-		self.factory = factory
-	''' downloader sending callback '''
-	def send_successed(self, index):
-		pass
-
-	def send_failed(self, index):
-		print '[task failed]No.', index
-
-class Auctioneer(object):
-
-	def __init__(self, peername, auctioneer_params):
+	def __init__(self, auctioneer_params, logger):
 		# propertys
-		self.peername = peername
-		self.delay = auctioneer_params['delay'] if auctioneer_params['delay'] > 1.0 else 1.0
 		self.auctioneer_params = auctioneer_params
-		# auction message server
-		self.message_server  = message.MessageServer(
-			setting.UDP_HOST, 
-			setting.UDP_AUCTION_PORT, 
+		self.peername = auctioneer_params['peer']
+		self.delay = auctioneer_params['delay'] if auctioneer_params['delay'] > 1.0 else 1.0
+		# discovery center
+		self.discovery_center = Listener(
+			setting.DIS_HOST,#auctioneer_params['broadcast'], 
+			setting.DIS_BID_PORT,
+			self)
+		# message center
+		self.message_center = Message(
+			setting.MSG_HOST, 
+			setting.MSG_AUC_PORT, 
+			setting.MSG_BID_PORT, 
 			AuctionProtocol(self))
-		# auction sender
-		self.message_client = message.MessageClient(
-			self.auctioneer_params['broadcast'],
-			setting.UDP_BID_PORT,
-			message.Protocol())
 		# transport center
 		self.transport = transport.TransportClient(
 			setting.TRP_PORT,
-			TransportProtocol(self))
+			transport.Protocol())
 		# log center
-		self.logger = log.LogClient(peername, self.auctioneer_params['broadcast'])
-		self.logger.add_peer(peername)
+		self.logger = logger #self.logger = log.LogClient(peername, self.auctioneer_params['broadcast'])
 		# algorithm core
 		self.core = AuctioneerCore(self, self.auctioneer_params)
+		self.running = 0
 
 	""" Auctioneer Life Cycle"""
-	def start(self):
-		print 'Auctioneer', self.peername, '[ delay = ', self.auctioneer_params['delay'],'] running...'
+	def run(self):
+		print ''
+		print '### Auctioneer', self.peername, '( delay = ', self.auctioneer_params['delay'],') running...'
+		print ''
 		# INIT
 		self.running = 1
 		self.transport_queue = Queue()
@@ -81,20 +77,17 @@ class Auctioneer(object):
 		self.tasks = {}# tasks {ip:task number}
 		self.auction_index = 0
 		# launch
-		self.message_server.start()
-		self.message_client.start()
+		self.discovery_center.run()
+		self.message_center.run()
 		threading.Thread(target=self.auction_loop).start() # join ignore
-		
-
-	def join(self):
-		self.message_server.join()
-		self.message_client.join()
 
 	def close(self):
-		self.message_server.close()
-		self.message_client.close()
+		self.discovery_center.close()
+		self.message_center.close()
 		self.running = 0
-		print 'Auctioneer', self.peername, 'stopped.'
+		print ''
+		print '### Auctioneer', self.peername, 'stopped.'
+		print ''
 
 
 	def auction_loop(self):
@@ -104,20 +97,20 @@ class Auctioneer(object):
 				ip,task = self.transport_queue.get(timeout=0.3)
 			except:
 				#Time out
-				''' deprecated
 				self.auction()
 				time.sleep(0.1)
-				''' 
 				#repeated broadcast
+				''' deprecated
 				for i in range(3):
 					self.auction()
 					time.sleep(0.033)
+				'''
 				self.decide_auction()
 			else:
 				if not ip in self.tasks or self.tasks[ip] <= 0:
 					continue
 				index, url = task.split(',',1)
-				size, duration = self.transport.transport(ip, index, url)
+				size, duration, success = self.transport.transport(ip, index, url)
 				size = float(size) / 1024 / 128 #bytes to mb
 				#delay
 				if self.delay > 1.0:
@@ -127,11 +120,12 @@ class Auctioneer(object):
 				capacity = size / duration if duration > 0 else self.auctioneer_params['capacity']
 				self.core.estimate_capacity(capacity)
 				self.tasks[ip] = self.tasks[ip] - 1
-				#logging 
-				self.logger.transport_complete(ip, index, size, duration)
-				print '[task completed]No.', index,
-				print ', size =', round(size,3), '(mb), capacity =', round(capacity,3),'~', round(self.core.capacity,3), '(mbps), url = ', url,
-				print ', at',time.strftime("%H:%M:%S")
+				if success:
+					#logging 
+					#self.logger.log('T', [ip, index, size, duration])#self.logger.transport_complete(ip, index, size, duration)
+					print '[A  completed] No.%s, size=%0.2f(mb), capacity=%0.2f~%0.2f(mbps), url=%s, at %s' % (index, size, capacity, self.core.capacity, url, time.strftime("%H:%M:%S"))
+				else:
+					print '[A     failed] No.%s' % index
 			
 
 
@@ -141,17 +135,21 @@ class Auctioneer(object):
 	"""
 	def auction(self):
 		# logging
-		self.logger.auction_broadcast(self.peername, 
+		'''
+		self.logger.log('A', [
+			self.peername, 
 			self.auction_index,
 			self.auctioneer_params['segment'], 
 			self.core.capacity, 
 			self.auctioneer_params['timecost'], 
 			self.auctioneer_params['cellular'], 
-			self.auctioneer_params['wifi'])
+			self.auctioneer_params['wifi']
+			])'''
 		# broadcast
 		self.bids.clear()
 		auction_info = self.core.auction_message(self.auction_index)
-		self.message_client.broadcast(':'.join(['AUCTION', auction_info]))
+		for peer in self.discovery_center.peers.keys():
+				self.message_center.sendto(peer, ':'.join(['AUCTION', auction_info]))
 
 	def receive_bid(self, ip, bid):
 		index, bid_details = bid.split(',',1)
@@ -170,15 +168,18 @@ class Auctioneer(object):
 		for ip in allocs:
 			self.tasks[ip] = allocs[ip][0]
 			alloc_result =  ','.join([str(allocs[ip][0]), str(allocs[ip][1])])
-			self.message_client.sendto(ip, ':'.join(['WIN', alloc_result]))
+			self.message_center.sendto(ip, ':'.join(['WIN', alloc_result]))
 			# logging
-			self.logger.auction_decide(self.peername, self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2])
+			#self.logger.log('D', [self.peername, self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]])
 		# logging
-		self.logger.decide_complete(self.peername)
+		#self.logger.log('C', self.peername)#self.logger.decide_complete(self.peername)
 
 	def receive_task(self, ip, task):
 		self.transport_queue.put((ip,task))
-		
+
+#UNIT TEST
+
+from controller import Slave		
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='Auctioneer')
@@ -192,6 +193,7 @@ def parse_args():
 	parser.add_argument('-a', '--broadcast', default=setting.UDP_BROADCAST, help='udp broadcast address')
 	args = parser.parse_args()
 	auctioneer_params = {}
+	auctioneer_params['peer'] = args.peer
 	auctioneer_params['segment'] = args.segment
 	auctioneer_params['capacity'] = args.capacity
 	auctioneer_params['timecost'] = args.timecost
@@ -199,12 +201,18 @@ def parse_args():
 	auctioneer_params['wifi'] = args.wifi
 	auctioneer_params['delay'] = args.delay
 	auctioneer_params['broadcast'] = args.broadcast
-	return args.peer, auctioneer_params
+	return auctioneer_params
 
 if __name__ == "__main__":
-	peer, auctioneer_params = parse_args()
-	auctioneer  = Auctioneer(peer, auctioneer_params)
-	auctioneer.start()
+	# params
+	auctioneer_params = parse_args()
+	# logger
+	logger = Slave(auctioneer_params['peer'])
+	logger.run()
+	logger.introduce()
+	# auctioneer
+	auctioneer  = Auctioneer(auctioneer_params, logger)
+	auctioneer.run()
 	try:
 		while True:
 			command = raw_input().lower()
@@ -215,4 +223,4 @@ if __name__ == "__main__":
 	except KeyboardInterrupt:
 		pass
 	auctioneer.close()
-	auctioneer.join()
+	logger.close()
