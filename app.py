@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
+import sys
 import time
 import argparse
 from controller import Slave
@@ -19,8 +20,11 @@ class ManualSlave(Slave):
 		self.bidder.run()
 		self.auctioneer.run()
 		if streaming:
-			from qtvlc_player import QtvlcPlayer
-			player = QtvlcPlayer()
+			if sys.platform.startswith('linux'):
+				from vlc_player import VlcPlayer as Player
+			elif sys.platform.startswith('darwin'):
+				from qtvlc_player import QtvlcPlayer as Player
+			player = Player()
 			player.open_api_run()
 		else:
 			try:
@@ -42,8 +46,11 @@ class AutoSlave(Slave):
 		self.bidder  = Bidder(setting.default_bidder_params(self.peername), self)
 		self.auctioneer = Auctioneer(setting.default_auctioneer_params(self.peername), self)
 		if streaming:
-			from qtvlc_player import QtvlcPlayer
-			player = QtvlcPlayer()
+			if sys.platform.startswith('linux'):
+				import qtvlc_player.QtvlcPlayer as Player
+			elif sys.platform.startswith('darwin'):
+				import vlc_player.VlcPlayer as Player
+			player = Player()
 			player.open_api_run()
 		else:
 			try:
