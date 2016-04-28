@@ -1,5 +1,6 @@
 *.pyc
 .DS_Store
-*.log
 /buffer/*.ts
+/log/*.png
+/log/*.log
 
