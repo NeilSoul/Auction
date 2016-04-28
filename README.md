@@ -2,17 +2,17 @@
 
 ## Requirements
 
-running platform : `python2.7`
-software needed if play streaming : `mplayer`
-python module needed : `m3u8`
+python : `python2.7`
 
-```
-sudo apt-get install mplayer
+### Python Module Needed
+
+M3U8 Module
+```bash
 sudo pip install m3u8
 ```
 
-energy module:
-```
+Energy Module (optional)
+```bash
 apt-get install python-smbus
 ```
 edit `/boot/config.txt`
@@ -27,6 +27,18 @@ edit `/etc/modules`, appending
 i2c-bcm2708
 i2c-ev
 ```
+
+Player Module (optional if need to show video)
+```bash
+# vlc
+# PyQt
+```
+
+Plot Module (optional if need master running)
+```bash
+sudo pip install matplotlib
+```
+
 
 ## Run
 
