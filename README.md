@@ -31,7 +31,10 @@ i2c-ev
 Player Module (optional if need to show video)
 ```bash
 # vlc
-# PyQt
+sudo apt-get install vlc
+sudo pip install python-vlc
+# PyQt on MacOS
+brew install pyqt
 ```
 
 Plot Module (optional if need master running)
@@ -42,118 +45,45 @@ sudo pip install matplotlib
 
 ## Run
 
-Usage of auctioneer :
+Usage of app.py :
 ```
-usage: auctioneer.py [-h] [-p PEER] [-s SEGMENT] [-c CAPACITY] [-t TIMECOST]
-                     [-l LTE] [-w WIFI] [-d DELAY] [-a BROADCAST]
+usage: app.py [-h] [-p PEER] [-r ROLE] [-a] [-s SCENE] [-l LOG] [-v]
 
-Auctioneer
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -p PEER, --peer PEER  name of peer
-  -s SEGMENT, --segment SEGMENT
-                        segments per auction
-  -c CAPACITY, --capacity CAPACITY
-                        initial capacity
-  -t TIMECOST, --timecost TIMECOST
-                        rebuffer time cost coefficient
-  -l LTE, --lte LTE     lte cost coefficient
-  -w WIFI, --wifi WIFI  WiFi cost coefficient
-  -d DELAY, --delay DELAY
-                        delay of data transport.
-  -a BROADCAST, --broadcast BROADCAST
-                        udp broadcast address
-```
-To stop auctioneer : 
-```
-Ctrl+C or input [exit]
-```
-
-Usage of bidder : 
-```
-usage: bidder.py [-h] [-p PEER] [-u URL] [-s] [-t THETA] [-q QUALITY]
-                 [-b BUFFER] [-m MBUFFER] [-a BROADCAST]
-
-Bidder
+App
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PEER, --peer PEER  name of peer
-  -u URL, --url URL     url to play
-  -s, --silent          not play video actually
-  -t THETA, --theta THETA
-                        bidder preference theta
-  -q QUALITY, --quality QUALITY
-                        bidder quality coefficient
-  -b BUFFER, --buffer BUFFER
-                        bidder buffer coefficient
-  -m MBUFFER, --mbuffer MBUFFER
-                        bidder max buffer
-  -a BROADCAST, --broadcast BROADCAST
-                        udp broadcast address
-```
-To stop auctioneer : 
-```
-Ctrl+C or input [exit]
-```
-
-Run of log :
-```
-usage: log.py [-h] [-l LOGFILE]
-
-Logger
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -l LOGFILE, --logfile LOGFILE
-                        file name of the log.
-```
-Exit of log :
-```
-Ctrl+C
-```
-
-Run of Script:
-```
-usage: script.py [-h] [-c] [-l LOGFILE] [-p PEER]
-
-Script
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -c, --center          if is a role of center(peer default)
-  -l LOGFILE, --logfile LOGFILE
-                        file name of the log.
   -p PEER, --peer PEER  peer name
+  -r ROLE, --role ROLE  role of the app, to be m(Master) or s(Slave)
+  -a, --auto            if is a automatic slave
+  -s SCENE, --scene SCENE
+                        select a scene
+  -l LOG, --log LOG     log file
+  -v, --video           will play video
 ```
 
-Example (Manual):
-
-```
-python log.py
-# firstly open log at one terminal.
-```
-```
-python auctioneer.py -p A -s 5
-# secondly open auctioneer named A ,and set number of segment to be 5.
+Example to run a slave
+```bash
+# do not show video
+python app.py -r s
+# set peername and show video
+python app.py -p A -r s -v
+# ctr + C or type 'exit' to stop a slave
 ```
 
-```
-python bidder.py -p B -s
-# thirdly open bidder name B, which  not actually play but just download.
-```
-
-Example (Script):
-
-at peer
-```
-python script.py -p A
+Example to run a master (optional, simluate some scene or collect datas and plot some charts)
+```bash
+# simple master
+python app.py -r m
 ```
 
-at center
+Example to run some scene
+```bash
+# At one pc
+python app.py -r m -s [scene code]
+# At others
+python app.py -r s [peername] -a
 ```
-python script.py -c
-```
+
 
 
