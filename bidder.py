@@ -143,6 +143,8 @@ class Bidder(object):
 			auction_peer, auction_index, bid = bid_pack
 			# logging
 			#self.logger.log('B', [self.peername, auction_peer, auction_index, self.buffer_size(), bid])
+			logcontent = 'auctioneer=%s, index=%d, buffer=%0.2f, bitrates=%s, prices=%s, gains=%s' % (auction_peer, int(auction_index), self.buffer_size(), str([ r/1024.0/1024.0 for r in bid[0]]), str(bid[1]), str(bid[2]))
+			self.logger.slave_bid(logcontent)
 			# response
 			bid_info = ','.join([auction_index, str(bid)])
 			self.message_center.sendto(ip, ':'.join(['BID', bid_info]))

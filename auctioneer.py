@@ -123,6 +123,7 @@ class Auctioneer(ListenerProtocol):
 				if success:
 					#logging 
 					#self.logger.log('T', [ip, index, size, duration])#self.logger.transport_complete(ip, index, size, duration)
+					self.logger.slave_transport([ip, index, size, duration])
 					print '[A  completed] No.%s, size=%0.2f(mb), capacity=%0.2f~%0.2f(mbps), url=%s, at %s' % (index, size, capacity, self.core.capacity, url, time.strftime("%H:%M:%S"))
 				else:
 					print '[A     failed] No.%s' % index
@@ -145,6 +146,8 @@ class Auctioneer(ListenerProtocol):
 			self.auctioneer_params['cellular'], 
 			self.auctioneer_params['wifi']
 			])'''
+		logcontent = 'index=%d, segments=%d, capacity=%0.2f, ' % (self.auction_index,self.auctioneer_params['segment'],self.core.capacity)
+		self.logger.slave_auction(logcontent)
 		# broadcast
 		self.bids.clear()
 		auction_info = self.core.auction_message(self.auction_index)
@@ -171,6 +174,7 @@ class Auctioneer(ListenerProtocol):
 			self.message_center.sendto(ip, ':'.join(['WIN', alloc_result]))
 			# logging
 			#self.logger.log('D', [self.peername, self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]])
+			self.logger.slave_decide([self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]])
 		# logging
 		#self.logger.log('C', self.peername)#self.logger.decide_complete(self.peername)
 

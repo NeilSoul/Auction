@@ -14,14 +14,19 @@ class BidderCore(object):
 		self.k_theta = bidder_params['ktheta']
 		self.k_br = bidder_params['kbr']
 		self.k_capacity = bidder_params['kcapacity']
+		self.a_link = bidder_params['alink']
+		self.a_buf = bidder_params['abuf']
 		self.max_buffer_size = setting.BIDDER_MAX_BUF if not 'mbuf' in bidder_params else bidder_params['mbuf']
-		self.previous_bitrate = 0
+		self.previous_bitrate = bidder_params['prate']
 		# M's f(r)
 		self.valuations = {}
 		fr = 1.0
 		for r in self.factory.player.get_rate_list():
 			self.valuations[r] = fr
 			fr += 1.0
+		# Global Informations
+		self.g_capacities = {}
+		self.g_bidder_number = bidder_params['bnumber']
 
 	""" event handler """
 	# bid to auction @return bid : [a_peer, a_index, bid_details]
@@ -38,6 +43,12 @@ class BidderCore(object):
 		cti = float(cti)
 		cda = float(cda)
 		cwda = float(cwda)
+		self.g_capacities[auction_peer] = capacity
+		# decide whether to bid
+		if capacity == 0:
+			return None
+		if capacity < self.a_link*sum(self.g_capacities.values())/self.g_bidder_number and current_buffer_size < self.a_buf*self.previous_bitrate*self.factory.player.get_segment_duration()/capacity:
+			return None
 		# calculate bitrates vector and prices vector
 		bitrates = []
 		prices = []
@@ -66,7 +77,8 @@ class BidderCore(object):
 		mrate = float(rate) / 1024 / 1024 
 		kb =  k*self.factory.player.get_segment_duration()
 		#depracated 1.0 : a = kb * math.log(1+self.preference()*self.valuation[rate])
-		a = kb * math.log(1+math.sqrt(self.preference())*self.valuation(rate, cti))
+		#a = kb * math.log(1+math.sqrt(self.preference())*self.valuation(rate, cti))
+		a = kb * math.log(1 + self.preference() + self.valuation(rate, cti))
 		b = self.valuation_kqv*(self.previous_bitrate - mrate) if self.previous_bitrate - rate > 0 else 0
 		T = k*self.factory.player.get_max_rate() /1024/1024/capacity
 		buffer_current = self.factory.buffer_size() 
@@ -82,7 +94,8 @@ class BidderCore(object):
 
 	# preference
 	def preference(self):
-		return self.basic_preference + self.k_theta * self.factory.buffer_size() / self.max_buffer_size
+		#return self.basic_preference + self.k_theta * self.factory.buffer_size() / self.max_buffer_size
+		return self.basic_preference + self.k_theta * self.max_buffer_size / (self.factory.buffer_size() +  self.factory.player.get_segment_duration())
 
 	# f(r)
 	def valuation(self, rate, cti):
@@ -90,7 +103,8 @@ class BidderCore(object):
 		return self.k_br / math.sqrt(self.basic_preference + 0.5*self.k_theta) * math.exp(r *cti + r*r - 1)
 		'''
 		#return self.valuations[rate]
-		return 0.5 +float(rate) / 1024 / 1024
+		#return 0.5 +float(rate) / 1024 / 1024
+		return 3*math.log(1+float(rate)/1024/1024)
 		#return 2.0*math.log(1+float(rate)/1024/1024)
 
 # unit test

@@ -12,8 +12,8 @@ class PygletPlayer(pyglet.window.Window):
 		super(PygletPlayer,self).__init__(caption=caption,resizable=True)
 		self.player = None
 		self.source_queue = Queue()
-		self.width = 954
-		self.height = 512
+		self.width = 320
+		self.height = 207
 
 	def on_draw(self):
 		self.clear()

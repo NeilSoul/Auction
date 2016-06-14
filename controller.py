@@ -43,32 +43,50 @@ class Slave(ListenerProtocol, MessageProtocol):
 		pack = struct.pack('!fff', *desc)
 		self.log('P', pack)
 
+	def slave_bid(self, desc):
+		#[auction_peer, auction_index, self.buffer_size(), bid]
+		pack = str(desc)
+		self.log('B', pack)
 
+	def slave_auction(self, desc):
+		self.log('A', desc)
+
+	def slave_decide(self, desc):
+		#[self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]]
+		self.log('D', str(desc))
+
+	def slave_transport(self, desc):
+		#[ip, index, size, duration]
+		self.log('T', str(desc))
 
 	'MessageProtocol'
 	def on_msg_from_peer(self, data, peer):
 		#print 'received', data, 'from', peer
-		if data == 'B1':
-			self.bidder_start_from_master(peer)
-		elif data == 'B2':
-			self.bidder_stop_from_master(peer)
-		elif data == 'A1':
-			self.auctioneer_start_from_master(peer)
-		elif data == 'A2':
-			self.auctioneer_stop_from_master(peer)
+		try:
+			inst, info = data.split(':',1)
+		except:
+			return
+		if inst == 'B1':
+			self.bidder_start_from_master(peer, info)
+		elif inst == 'B2':
+			self.bidder_stop_from_master(peer, info)
+		elif inst == 'A1':
+			self.auctioneer_start_from_master(peer, info)
+		elif inst == 'A2':
+			self.auctioneer_stop_from_master(peer, info)
 
 
 	'Override'
-	def bidder_start_from_master(self, master_ip):
+	def bidder_start_from_master(self, master_ip, info):
 		pass
 
-	def bidder_stop_from_master(self, master_ip):
+	def bidder_stop_from_master(self, master_ip, info):
 		pass
 
-	def auctioneer_start_from_master(self, master_ip):
+	def auctioneer_start_from_master(self, master_ip, info):
 		pass
 
-	def auctioneer_stop_from_master(self, master_ip):
+	def auctioneer_stop_from_master(self, master_ip, info):
 		pass
 
 class Master(MessageProtocol):
@@ -139,23 +157,53 @@ class Master(MessageProtocol):
 		if tag == 'INT':#introduce
 			self.slaves[pack] = peer
 			self.peers[peer] = pack
-			logging.info('%s@join %s' % (pack, peer))
+			logging.info('%s@join ip=%s' % (pack, peer))
 			self.on_slave_join(pack)
-		elif tag == 'P':
+		else:
 			try:
 				peername = self.peers[peer]
 			except:
-				pass
-			else:
+				return
+			if tag == 'P':
 				self.on_slave_play(peername, pack)
-		else:
-			pass
+			elif tag == 'B':
+				self.on_slave_bid(peername, pack)
+			elif tag == 'A':
+				self.on_slave_auction(peername, pack)
+			elif tag == 'D':
+				self.on_slave_decide(peername, pack)
+			elif tag == 'T':
+				self.on_slave_transport(peername, pack)
 
 	'Recall API'
 	def on_slave_play(self, peername, pack):
 		rate, duration, delay = struct.unpack('!fff', pack)
 		self.plot_rate_add((rate,duration,delay))
-		logging.info('%s@play r=%0.2f, t=%0.2f, d=%0.2f'% (peername, rate, duration, delay))
+		logging.info('%s@play rate=%0.2f, duration=%0.2f, rebuffer=%0.2f'% (peername, rate, duration, delay))
+
+	def on_slave_bid(self, peername, pack):
+		logging.info('%s@bid %s' % (peername, pack))
+
+	def on_slave_auction(self, peername, pack):
+		logging.info('%s@auction %s' % (peername, pack))
+
+	def on_slave_decide(self, peername, pack):
+		#[self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]]
+		index, ip, tasks, bitrate, price = eval(pack)
+		try:
+			bidderpeer = self.peers[ip]
+		except:
+			return
+		logging.info('%s@decide index=%d, winner=%s, bitrate=%0.2f, price=%0.2f, segments=%d' % (peername, index, bidderpeer, bitrate/1024.0/1024.0, price, tasks))
+
+	def on_slave_transport(self, peername, pack):
+		#[ip, index, size, duration]
+		ip, index, size, duration = eval(pack)
+		try:
+			bidderpeer = self.peers[ip]
+		except:
+			return
+		logging.info('%s@transport index=%d, bidder=%s, size=%0.2f, transport_duration=%0.2f' %(peername, int(index), bidderpeer, size, duration))
 
 	#Overide
 	def on_slave_join(self, peername):

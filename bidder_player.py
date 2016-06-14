@@ -34,7 +34,7 @@ class BidderPlayer(object):
 			for f in files:
 				filePath = os.path.join(self.buffer_folder, f)
 				if filePath.endswith('.ts') and os.path.isfile(filePath):
-					pass#os.remove(filePath)
+					os.remove(filePath)
 		except Exception, e:
 			print e
 

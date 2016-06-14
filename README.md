@@ -82,7 +82,7 @@ Example to run some scene
 # At one pc
 python app.py -r m -s [scene code]
 # At others
-python app.py -r s [peername] -a
+python app.py -r s -p [peername] -a
 ```
 
 

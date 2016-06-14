@@ -120,7 +120,7 @@ class QtvlcPlayer(QtGui.QMainWindow):
 		Thread(target=self.open_api_scan).start()
 		# start app
 		self.show()
-		self.resize(954, 512)
+		self.resize(320, 207)
 		self.app.exec_()
 
 	def open_api_exit(self):

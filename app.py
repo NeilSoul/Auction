@@ -43,8 +43,9 @@ class AutoSlave(Slave):
 	def loop(self, streaming = False):
 		self.run()
 		self.introduce()
-		self.bidder  = Bidder(setting.default_bidder_params(self.peername), self)
-		self.auctioneer = Auctioneer(setting.default_auctioneer_params(self.peername), self)
+		#auctioneer bidder
+		self.bidder = None
+		self.auctioneer = None
 		if streaming:
 			if sys.platform.startswith('linux'):
 				import qtvlc_player.QtvlcPlayer as Player
@@ -60,26 +61,36 @@ class AutoSlave(Slave):
 						break
 			except KeyboardInterrupt:
 				pass
-		if self.bidder.running:
+		if self.bidder and self.bidder.running:
 			self.bidder.close()
-		if self.auctioneer.running:
+		if self.auctioneer and self.auctioneer.running:
 			self.auctioneer.close()
 		self.close()
 
 	'Override'
-	def bidder_start_from_master(self, master_ip):
-		if not self.bidder.running:
-			self.bidder.run()
+	def bidder_start_from_master(self, master_ip, info):
+		if self.bidder and self.bidder.running:
+			self.bidder.close()
+		bidder_params = setting.default_bidder_params(self.peername)
+		bidder_params['bnumber'] = int(info)
+		self.bidder  = Bidder(bidder_params, self)
+		self.bidder.run()
 
-	def bidder_stop_from_master(self, master_ip):
-		self.bidder.close()
+	def bidder_stop_from_master(self, master_ip, info):
+		if self.bidder:
+			self.bidder.close()
 
-	def auctioneer_start_from_master(self, master_ip):
-		if not self.auctioneer.running:
-			self.auctioneer.run()
+	def auctioneer_start_from_master(self, master_ip, info):
+		if self.auctioneer and self.auctioneer.running:
+			self.auctioneer.close()
+		auctioneer_params = setting.default_auctioneer_params(self.peername)
+		auctioneer_params['delay'] = float(info)
+		self.auctioneer = Auctioneer(auctioneer_params, self)
+		self.auctioneer.run()
 
-	def auctioneer_stop_from_master(self, master_ip):
-		self.auctioneer.close()
+	def auctioneer_stop_from_master(self, master_ip, info):
+		if self.auctioneer:
+			self.auctioneer.close()
 
 class ManualMaster(Master):
 
@@ -132,24 +143,151 @@ class SceneMaster(Master):
 	def scene_process(self):
 		print 'Scene to be write...'
 
-class SceneA(SceneMaster):
+class SceneNo1(SceneMaster):
 
 	def set_scene_members(self):
 		self.members = ['A']
 
 	def scene_process(self):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'B1')
+		self.send_order_to_slave('A', 'B1:1')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1')
-		time.sleep(30.0)
+		self.send_order_to_slave('A', 'A1:75')
+		time.sleep(200.0)
 		print 'A close bidder at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'B2')
+		self.send_order_to_slave('A', 'B2:')
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A2')
+		self.send_order_to_slave('A', 'A2:')
 
+class SceneNo2(SceneMaster):
 
+	def set_scene_members(self):
+		self.members = ['A']
 
+	def scene_process(self):
+		print 'A launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B1:1')
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:150')
+		time.sleep(200.0)
+		print 'A close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B2:')
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+
+class SceneNo3(SceneMaster):
+
+	def set_scene_members(self):
+		self.members = ['A']
+
+	def scene_process(self):
+		print 'A launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B1:1')
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:750')
+		time.sleep(200.0)
+		print 'A close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B2:')
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+
+class SceneCo4(SceneMaster):
+
+	def set_scene_members(self):
+		self.members = ['A', 'B', 'C']
+
+	def scene_process(self):
+		print 'A launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B1:3')
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:75')
+		print 'B launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B1:3')
+		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A1:150')
+		print 'C launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('C', 'B1:3')
+		print 'C launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('C', 'A1:750')
+		time.sleep(200.0)
+		print 'A close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B2:')
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+		print 'B close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B2:')
+		print 'B close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A2:')
+		print 'C close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('C', 'B2:')
+		print 'C close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('C', 'A2:')
+
+class SceneCo5(SceneMaster):
+
+	def set_scene_members(self):
+		self.members = ['A', 'B']
+
+	def scene_process(self):
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:75')
+		print 'B launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B1:2')
+		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A1:750')
+		time.sleep(200.0)
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+		print 'B close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B2:')
+		print 'B close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A2:')
+
+class SceneCo6(SceneMaster):
+
+	def set_scene_members(self):
+		self.members = ['A', 'B']
+
+	def scene_process(self):
+		#0~40s
+		print 'A launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B1:2')
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:75')
+		print 'B launch bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B1:2')
+		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A1:75')
+		time.sleep(40.0)
+		#40s~90s
+		print 'B close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A2:')
+		time.sleep(1.0)
+		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A1:750')
+		time.sleep(50.0)
+		#90~150s
+		print 'B close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A2:')
+		time.sleep(1.0)
+		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A1:75')
+		time.sleep(10.0)
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+		time.sleep(1.0)
+		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A1:750')
+		time.sleep(50.0)
+		#final
+		print 'A close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'A2:')
+		print 'A close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('A', 'B2:')
+		print 'B close bidder at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'B2:')
+		print 'B close auctioneer at', time.strftime("%H:%M:%S")
+		self.send_order_to_slave('B', 'A2:')
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='App')
@@ -167,8 +305,23 @@ if __name__=="__main__":
 		if args.scene == 'N':
 			m = ManualMaster(args.peer, args.log)
 			m.loop()
-		else:
-			m = SceneA(args.peer, args.log)
+		elif args.scene == 'N1':
+			m = SceneNo1(args.peer, args.log)
+			m.loop()
+		elif args.scene == 'N2':
+			m = SceneNo2(args.peer, args.log)
+			m.loop()
+		elif args.scene == 'N3':
+			m = SceneNo3(args.peer, args.log)
+			m.loop()
+		elif args.scene == 'C4':
+			m = SceneCo4(args.peer, args.log)
+			m.loop()
+		elif args.scene == 'C5':
+			m = SceneCo5(args.peer, args.log)
+			m.loop()
+		elif args.scene == 'C6':
+			m = SceneCo6(args.peer, args.log)
 			m.loop()
 	else:
 		if args.auto:
