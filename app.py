@@ -3,6 +3,7 @@
 import sys
 import time
 import argparse
+import threading
 from controller import Slave
 from controller import Master
 import setting
@@ -131,8 +132,7 @@ class SceneMaster(Master):
 			self.scene_start()
 
 	def scene_start(self):
-		self.scene_process()
-		self.running = 0
+		threading.Thread(target = self.scene_process).start()
 
 	#Overide
 	def set_scene_members(self):
@@ -143,6 +143,9 @@ class SceneMaster(Master):
 	def scene_process(self):
 		print 'Scene to be write...'
 
+	def scene_process_end(self):
+		self.running = 0
+
 class SceneNo1(SceneMaster):
 
 	def set_scene_members(self):
@@ -152,12 +155,13 @@ class SceneNo1(SceneMaster):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B1:1')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:75')
+		self.send_order_to_slave('A', 'A1:2.20')
 		time.sleep(200.0)
 		print 'A close bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B2:')
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'A2:')
+		self.scene_process_end()
 
 class SceneNo2(SceneMaster):
 
@@ -168,12 +172,13 @@ class SceneNo2(SceneMaster):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B1:1')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:150')
+		self.send_order_to_slave('A', 'A1:4.40')
 		time.sleep(200.0)
 		print 'A close bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B2:')
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'A2:')
+		self.scene_process_end()
 
 class SceneNo3(SceneMaster):
 
@@ -184,12 +189,13 @@ class SceneNo3(SceneMaster):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B1:1')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:750')
+		self.send_order_to_slave('A', 'A1:22')
 		time.sleep(200.0)
 		print 'A close bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B2:')
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'A2:')
+		self.scene_process_end()
 
 class SceneCo4(SceneMaster):
 
@@ -200,15 +206,15 @@ class SceneCo4(SceneMaster):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B1:3')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:75')
+		self.send_order_to_slave('A', 'A1:2.2')
 		print 'B launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'B1:3')
 		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('B', 'A1:150')
+		self.send_order_to_slave('B', 'A1:4.4')
 		print 'C launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('C', 'B1:3')
 		print 'C launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('C', 'A1:750')
+		self.send_order_to_slave('C', 'A1:22')
 		time.sleep(200.0)
 		print 'A close bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B2:')
@@ -222,6 +228,7 @@ class SceneCo4(SceneMaster):
 		self.send_order_to_slave('C', 'B2:')
 		print 'C close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('C', 'A2:')
+		self.scene_process_end()
 
 class SceneCo5(SceneMaster):
 
@@ -230,11 +237,11 @@ class SceneCo5(SceneMaster):
 
 	def scene_process(self):
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:75')
+		self.send_order_to_slave('A', 'A1:2.2')
 		print 'B launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'B1:2')
 		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('B', 'A1:750')
+		self.send_order_to_slave('B', 'A1:22')
 		time.sleep(200.0)
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'A2:')
@@ -242,6 +249,7 @@ class SceneCo5(SceneMaster):
 		self.send_order_to_slave('B', 'B2:')
 		print 'B close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'A2:')
+		self.scene_process_end()
 
 class SceneCo6(SceneMaster):
 
@@ -253,31 +261,31 @@ class SceneCo6(SceneMaster):
 		print 'A launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'B1:2')
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:75')
+		self.send_order_to_slave('A', 'A1:2.2')
 		print 'B launch bidder at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'B1:2')
 		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('B', 'A1:75')
+		self.send_order_to_slave('B', 'A1:2.2')
 		time.sleep(40.0)
 		#40s~90s
 		print 'B close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'A2:')
 		time.sleep(1.0)
 		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('B', 'A1:750')
+		self.send_order_to_slave('B', 'A1:22')
 		time.sleep(50.0)
 		#90~150s
 		print 'B close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'A2:')
 		time.sleep(1.0)
 		print 'B launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('B', 'A1:75')
+		self.send_order_to_slave('B', 'A1:2.2')
 		time.sleep(10.0)
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('A', 'A2:')
 		time.sleep(1.0)
 		print 'A launch auctioneer at', time.strftime("%H:%M:%S")
-		self.send_order_to_slave('A', 'A1:750')
+		self.send_order_to_slave('A', 'A1:22')
 		time.sleep(50.0)
 		#final
 		print 'A close auctioneer at', time.strftime("%H:%M:%S")
@@ -288,6 +296,7 @@ class SceneCo6(SceneMaster):
 		self.send_order_to_slave('B', 'B2:')
 		print 'B close auctioneer at', time.strftime("%H:%M:%S")
 		self.send_order_to_slave('B', 'A2:')
+		self.scene_process_end()
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='App')

@@ -42,7 +42,10 @@ class BidderCore(object):
 		capacity = float(capacity) * self.k_capacity
 		cti = float(cti)
 		cda = float(cda)
-		cwda = float(cwda)
+		if auction_peer == self.factory.peername:
+			cwda = 0.0
+		else:
+			cwda = float(cwda)
 		self.g_capacities[auction_peer] = capacity
 		# decide whether to bid
 		if capacity == 0:

@@ -103,19 +103,19 @@ class Master(MessageProtocol):
 		# logging
 		self.logfile = logfile if logfile else '%s-%s' % (time.strftime("%m-%d"),str(int(time.time()) % 100).zfill(3))
 		self.logfile = os.path.join(setting.LOG_DIR, self.logfile)
-		logging.basicConfig(level=logging.DEBUG,
-			format = '%(asctime)s %(filename)s [line:%(lineno)d] %(message)s',
-			datefmt = '%a, %d %b %Y %H:%M:%S',
-			filename = self.logfile+'.log',
-			filemode = 'a')
-		console = logging.StreamHandler()
-		console.setLevel(logging.INFO)
-		formatter = logging.Formatter('%(levelname)-8s %(message)s')
-		console.setFormatter(formatter)
-		logging.getLogger('').addHandler(console)
+		self.logger = logging.getLogger() 
+		self.logger.setLevel(logging.INFO)
+		fhandler = logging.FileHandler(self.logfile+'.log')  
+		formatter = logging.Formatter('%(asctime)s - %(message)s')
+		fhandler.setFormatter(formatter)
+		self.logger.addHandler(fhandler)
 		'Plot module'
 		import plot
 		self.plot = plot
+
+	#def loginfo(self, message):
+	#	print '%s %s\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), message)
+	#	#self.loghandler.write('%s %s\n', time.strftime('%Y-%m-%d %H:%M:%S'), message)
 
 	'Open API'
 	def run(self):
@@ -147,7 +147,6 @@ class Master(MessageProtocol):
 
 	'MessageProtocol'
 	def on_msg_from_peer(self, data, peer):
-		#print 'received', data, 'from', peer
 		# parse log message
 		try:
 			tag, pack = data.split(':',1)
@@ -157,7 +156,7 @@ class Master(MessageProtocol):
 		if tag == 'INT':#introduce
 			self.slaves[pack] = peer
 			self.peers[peer] = pack
-			logging.info('%s@join ip=%s' % (pack, peer))
+			self.logger.info('%s@join ip=%s' % (pack, peer))
 			self.on_slave_join(pack)
 		else:
 			try:
@@ -179,13 +178,13 @@ class Master(MessageProtocol):
 	def on_slave_play(self, peername, pack):
 		rate, duration, delay = struct.unpack('!fff', pack)
 		self.plot_rate_add((rate,duration,delay))
-		logging.info('%s@play rate=%0.2f, duration=%0.2f, rebuffer=%0.2f'% (peername, rate, duration, delay))
+		self.logger.info('%s@play rate=%0.2f, duration=%0.2f, rebuffer=%0.2f'% (peername, rate, duration, delay))
 
 	def on_slave_bid(self, peername, pack):
-		logging.info('%s@bid %s' % (peername, pack))
+		self.logger.info('%s@bid %s' % (peername, pack))
 
 	def on_slave_auction(self, peername, pack):
-		logging.info('%s@auction %s' % (peername, pack))
+		self.logger.info('%s@auction %s' % (peername, pack))
 
 	def on_slave_decide(self, peername, pack):
 		#[self.auction_index-1, ip, allocs[ip][0], allocs[ip][1], allocs[ip][2]]
@@ -194,7 +193,7 @@ class Master(MessageProtocol):
 			bidderpeer = self.peers[ip]
 		except:
 			return
-		logging.info('%s@decide index=%d, winner=%s, bitrate=%0.2f, price=%0.2f, segments=%d' % (peername, index, bidderpeer, bitrate/1024.0/1024.0, price, tasks))
+		self.logger.info('%s@decide index=%d, winner=%s, bitrate=%0.2f, price=%0.2f, segments=%d' % (peername, index, bidderpeer, bitrate/1024.0/1024.0, price, tasks))
 
 	def on_slave_transport(self, peername, pack):
 		#[ip, index, size, duration]
@@ -203,7 +202,7 @@ class Master(MessageProtocol):
 			bidderpeer = self.peers[ip]
 		except:
 			return
-		logging.info('%s@transport index=%d, bidder=%s, size=%0.2f, transport_duration=%0.2f' %(peername, int(index), bidderpeer, size, duration))
+		self.logger.info('%s@transport index=%d, bidder=%s, size=%0.2f, transport_duration=%0.2f' %(peername, int(index), bidderpeer, size, duration))
 
 	#Overide
 	def on_slave_join(self, peername):
